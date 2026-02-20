@@ -1,0 +1,15 @@
+{
+  "name": "gymos-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/backend",
+    "packages/contracts"
+  ],
+  "scripts": {
+    "backend:dev": "npm --workspace apps/backend run start:dev",
+    "backend:build": "npm --workspace apps/backend run build",
+    "contracts:build": "npm --workspace packages/contracts run build",
+    "infra:aws:fmt": "terraform -chdir=infra/aws/terraform fmt"
+  }
+}

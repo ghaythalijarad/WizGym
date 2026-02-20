@@ -1,0 +1,27 @@
+project_name = "wizgym"
+environment  = "prod"
+aws_region   = "us-east-1"
+
+# Required: set your real OTPIQ key before terraform apply.
+otpiq_api_key = "replace_with_real_key"
+
+# Optional tuning
+desired_count            = 1
+min_task_count           = 1
+max_task_count           = 4
+rds_instance_class       = "db.t4g.micro"
+redis_node_type          = "cache.t4g.micro"
+rds_multi_az             = false
+rds_deletion_protection  = false
+acm_certificate_arn      = ""
+backend_image_tag        = "latest"
+otpiq_provider           = "whatsapp-sms"
+otpiq_mock_mode          = false
+phone_otp_length         = 6
+phone_otp_ttl_seconds    = 300
+phone_otp_max_attempts   = 5
+phone_otp_rate_limit_seconds = 45
+
+common_tags = {
+  Owner = "wizgym"
+}

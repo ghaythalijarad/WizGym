@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules
+dist
+coverage
+npm-debug.log*
+
+# Flutter
+.dart_tool
+.packages
+.pub-cache
+.pub
+build
+
+# IDE
+.vscode
+.idea
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Terraform
+.terraform
+*.tfstate
+*.tfstate.*
+terraform.tfvars
