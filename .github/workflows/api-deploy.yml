@@ -45,11 +45,11 @@ jobs:
               working-directory: apps/api
               run: npx tsc --noEmit
 
-    # ─── Build & Deploy (only on main push) ────────────────────────────────
+    # ─── Build & Deploy (only on main push or manual dispatch) ───────────
     deploy:
         name: SAM Build & Deploy
         needs: check
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         runs-on: ubuntu-latest
         environment: production
 
