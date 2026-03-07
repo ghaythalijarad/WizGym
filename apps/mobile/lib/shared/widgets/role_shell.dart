@@ -92,6 +92,7 @@ class _RoleShellState extends State<RoleShell> {
             const OwnerStudioPage(),
             OwnerMembersPage(session: session),
             OwnerPlansPage(session: session),
+            RoleProfilePage(role: role, session: session),
           ],
           destinations: const [
             NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'الرئيسية'),
@@ -100,23 +101,28 @@ class _RoleShellState extends State<RoleShell> {
                 icon: Icon(Icons.group_outlined), label: 'الأعضاء'),
             NavigationDestination(
                 icon: Icon(Icons.card_membership_outlined), label: 'الخطط'),
+            NavigationDestination(
+                icon: Icon(Icons.person_outline), label: 'الملف'),
           ],
         );
       case AppRole.trainer:
-        return const _RoleTabsConfig(
+        return _RoleTabsConfig(
           pages: [
-            TrainerHomePage(),
-            TrainerGymsPage(),
-            TrainerSubscriptionsPage(),
-            TrainerPlansPage(),
+            const TrainerHomePage(),
+            const TrainerGymsPage(),
+            const TrainerSubscriptionsPage(),
+            const TrainerPlansPage(),
+            RoleProfilePage(role: role, session: session),
           ],
-          destinations: [
+          destinations: const [
             NavigationDestination(icon: Icon(Icons.today_outlined), label: 'اليوم'),
             NavigationDestination(icon: Icon(Icons.apartment_outlined), label: 'نواديي'),
             NavigationDestination(
                 icon: Icon(Icons.group_outlined), label: 'المتدربون'),
             NavigationDestination(
                 icon: Icon(Icons.fitness_center_outlined), label: 'الخطط'),
+            NavigationDestination(
+                icon: Icon(Icons.person_outline), label: 'الملف'),
           ],
         );
       case AppRole.user:
