@@ -6,11 +6,13 @@ on:
         paths:
             - "apps/api/**"
             - "infra/sam/**"
+            - ".github/workflows/api-deploy.yml"
     pull_request:
         branches: [main]
         paths:
             - "apps/api/**"
             - "infra/sam/**"
+            - ".github/workflows/api-deploy.yml"
     workflow_dispatch:
 
 permissions:

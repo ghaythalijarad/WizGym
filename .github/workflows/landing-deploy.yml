@@ -36,8 +36,10 @@ jobs:
                     --cache-control "public, max-age=3600"
 
             - name: Invalidate CloudFront (optional)
-              if: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID != '' }}
+              if: env.CF_DIST_ID != ''
+              env:
+                  CF_DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
               run: |
                   aws cloudfront create-invalidation \
-                    --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+                    --distribution-id "$CF_DIST_ID" \
                     --paths "/*"
