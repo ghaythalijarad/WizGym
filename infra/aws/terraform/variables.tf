@@ -209,9 +209,9 @@ variable "common_tags" {
 }
 
 variable "github_repo" {
-  description = "GitHub repository in org/repo format (e.g., ghaythallaheebi/WizGymProd)."
+  description = "GitHub repository in org/repo format (e.g., ghaythalijarad/WizGym)."
   type        = string
-  default     = "ghaythallaheebi/WizGymProd"
+  default     = "ghaythalijarad/WizGym"
 }
 
 variable "landing_s3_bucket" {
