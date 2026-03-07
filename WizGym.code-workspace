@@ -1,0 +1,308 @@
+{
+  "folders": [
+    {
+      "name": "🏠 Root",
+      "path": "."
+    },
+    {
+      "name": "Frontend (Mobile)",
+      "path": "apps/mobile"
+    },
+    {
+      "name": "Dashboard (Admin)",
+      "path": "apps/admin-dashboard"
+    },
+    {
+      "name": "Backend (API)",
+      "path": "apps/api"
+    },
+    {
+      "name": "🌐 Landing Page",
+      "path": "apps/landing"
+    },
+    {
+      "name": "📦 Contracts",
+      "path": "packages/contracts"
+    },
+    {
+      "name": "🏗️ Infrastructure",
+      "path": "infra"
+    },
+    {
+      "name": "📚 Documentation",
+      "path": "docs"
+    }
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+      "source.organizeImports": "explicit"
+    },
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.git": true,
+      "**/build": true,
+      "**/.dart_tool": true,
+      "**/ios/Pods": true,
+      "**/ios/build": true,
+      "**/dist": true,
+      "**/.aws-sam": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/build": true,
+      "**/.dart_tool": true,
+      "**/ios/Pods": true,
+      "**/ios/build": true,
+      "**/dist": true,
+      "**/.aws-sam": true,
+      "**/package-lock.json": true,
+      "**/pubspec.lock": true
+    },
+    "[dart]": {
+      "editor.formatOnSave": true,
+      "editor.formatOnType": true,
+      "editor.rulers": [80],
+      "editor.selectionHighlight": false,
+      "editor.suggest.snippetsPreventQuickSuggestions": false,
+      "editor.suggestSelection": "first",
+      "editor.tabCompletion": "onlySnippets",
+      "editor.wordBasedSuggestions": "off"
+    },
+    "[typescript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+      "editor.formatOnSave": true
+    },
+    "[javascript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+      "editor.formatOnSave": true
+    },
+    "[json]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "typescript.tsdk": "apps/api/node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true
+  },
+  "extensions": {
+    "recommendations": [
+      "dart-code.flutter",
+      "dart-code.dart-code",
+      "esbenp.prettier-vscode",
+      "dbaeumer.vscode-eslint",
+      "hashicorp.terraform",
+      "amazonwebservices.aws-toolkit-vscode",
+      "ms-vscode.vscode-typescript-next",
+      "bradlc.vscode-tailwindcss",
+      "eamodio.gitlens",
+      "usernamehw.errorlens",
+      "streetsidesoftware.code-spell-checker"
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "📱 Flutter: iOS Simulator",
+        "type": "dart",
+        "request": "launch",
+        "program": "apps/mobile/lib/main.dart",
+        "cwd": "apps/mobile"
+      },
+      {
+        "name": "📱 Flutter: iOS Device (Release)",
+        "type": "dart",
+        "request": "launch",
+        "program": "apps/mobile/lib/main.dart",
+        "cwd": "apps/mobile",
+        "flutterMode": "release"
+      },
+      {
+        "name": "📱 Flutter: Android",
+        "type": "dart",
+        "request": "launch",
+        "program": "apps/mobile/lib/main.dart",
+        "cwd": "apps/mobile",
+        "args": ["-d", "android"]
+      },
+      {
+        "name": "📱 Flutter: Profile Mode",
+        "type": "dart",
+        "request": "launch",
+        "program": "apps/mobile/lib/main.dart",
+        "cwd": "apps/mobile",
+        "flutterMode": "profile"
+      }
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Mobile: Flutter Clean",
+        "type": "shell",
+        "command": "flutter clean",
+        "options": {
+          "cwd": "${workspaceFolder:Frontend (Mobile)}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Mobile: Flutter Pub Get",
+        "type": "shell",
+        "command": "flutter pub get",
+        "options": {
+          "cwd": "${workspaceFolder:Frontend (Mobile)}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Mobile: Build iOS",
+        "type": "shell",
+        "command": "flutter build ios",
+        "options": {
+          "cwd": "${workspaceFolder:Frontend (Mobile)}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Mobile: Build Android",
+        "type": "shell",
+        "command": "flutter build apk --release",
+        "options": {
+          "cwd": "${workspaceFolder:Frontend (Mobile)}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Mobile: Flutter Run",
+        "type": "shell",
+        "command": "flutter run",
+        "options": {
+          "cwd": "${workspaceFolder:Frontend (Mobile)}"
+        },
+        "isBackground": true,
+        "problemMatcher": []
+      },
+      {
+        "label": "API: Install Dependencies",
+        "type": "shell",
+        "command": "npm install",
+        "options": {
+          "cwd": "${workspaceFolder:Backend (API)}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "API: Build",
+        "type": "shell",
+        "command": "npm run build",
+        "options": {
+          "cwd": "${workspaceFolder:Backend (API)}"
+        },
+        "problemMatcher": ["$tsc"]
+      },
+      {
+        "label": "API: Type Check",
+        "type": "shell",
+        "command": "npx tsc --noEmit",
+        "options": {
+          "cwd": "${workspaceFolder:Backend (API)}"
+        },
+        "problemMatcher": ["$tsc"]
+      },
+      {
+        "label": "API: SAM Build",
+        "type": "shell",
+        "command": "sam build",
+        "options": {
+          "cwd": "${workspaceFolder:🏗️ Infrastructure}/sam"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "API: SAM Deploy (prod)",
+        "type": "shell",
+        "command": "sam deploy --config-env prod",
+        "options": {
+          "cwd": "${workspaceFolder:🏗️ Infrastructure}/sam"
+        },
+        "problemMatcher": [],
+        "dependsOn": "API: SAM Build"
+      },
+      {
+        "label": "Logs: Tail Lambda (prod)",
+        "type": "shell",
+        "command": "aws logs tail /aws/lambda/sam-app-WizGymApiFunction-yE1SQSAsdJGg --since 10m --follow --profile wizgym-prod --region us-east-1",
+        "options": {
+          "cwd": "${workspaceFolder:🏠 Root}"
+        },
+        "isBackground": true,
+        "problemMatcher": []
+      },
+      {
+        "label": "Contracts: Install Dependencies",
+        "type": "shell",
+        "command": "npm install",
+        "options": {
+          "cwd": "${workspaceFolder:📦 Contracts}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Contracts: Build",
+        "type": "shell",
+        "command": "npm run build",
+        "options": {
+          "cwd": "${workspaceFolder:📦 Contracts}"
+        },
+        "problemMatcher": ["$tsc"]
+      },
+      {
+        "label": "Infrastructure: Terraform Init",
+        "type": "shell",
+        "command": "terraform init",
+        "options": {
+          "cwd": "${workspaceFolder:🏗️ Infrastructure}/aws/terraform"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Infrastructure: Terraform Plan",
+        "type": "shell",
+        "command": "terraform plan",
+        "options": {
+          "cwd": "${workspaceFolder:🏗️ Infrastructure}/aws/terraform"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Deploy: Admin Dashboard",
+        "type": "shell",
+        "command": "bash deploy.sh",
+        "options": {
+          "cwd": "${workspaceFolder:Dashboard (Admin)}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Deploy: iPhone",
+        "type": "shell",
+        "command": "bash deploy-iphone.sh",
+        "options": {
+          "cwd": "${workspaceFolder:🏠 Root}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Deploy: Full (Contracts → API → Admin)",
+        "type": "shell",
+        "command": "bash -lc 'set -euo pipefail; cd packages/contracts && npm run build; cd ../../apps/api && npm run build; cd ../../infra/sam && sam build && sam deploy --config-env prod; cd ../../apps/admin-dashboard && bash deploy.sh'",
+        "options": {
+          "cwd": "${workspaceFolder:🏠 Root}"
+        },
+        "problemMatcher": []
+      }
+    ]
+  }
+}

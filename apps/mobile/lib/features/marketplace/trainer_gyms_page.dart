@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/models/app_role.dart';
+import '../../core/theme/app_theme.dart';
 import 'marketplace_api_service.dart';
 import 'marketplace_models.dart';
 
@@ -14,7 +15,11 @@ class TrainerGymsPage extends StatefulWidget {
 class _TrainerGymsPageState extends State<TrainerGymsPage> {
   late final MarketplaceApiService _api;
   late Future<_TrainerGymsData> _dataFuture;
-  final TextEditingController _gymIdController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
+
+  List<GymSummary> _searchResults = [];
+  bool _isSearching = false;
+  String? _searchError;
 
   @override
   void initState() {
@@ -25,7 +30,7 @@ class _TrainerGymsPageState extends State<TrainerGymsPage> {
 
   @override
   void dispose() {
-    _gymIdController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -50,38 +55,122 @@ class _TrainerGymsPageState extends State<TrainerGymsPage> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             children: [
-              Text('شبكة النوادي', style: Theme.of(context).textTheme.headlineSmall),
+              Text('شبكة النوادي',
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(color: AppTheme.cardLime)),
               const SizedBox(height: 8),
               Text(
                 'يمكنك الانضمام إلى 4 نوادٍ كحد أقصى.',
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: AppTheme.textSecondary),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _gymIdController,
-                decoration: const InputDecoration(
-                  labelText: 'أدخل Gym ID للانضمام',
-                  hintText: 'مثال: gym-2001',
+              const SizedBox(height: 16),
+
+              // Search Section
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  color: AppTheme.cardLavender.withValues(alpha: 0.08),
+                  border: Border.all(
+                      color: AppTheme.cardLavender.withValues(alpha: 0.15)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('البحث عن نادي',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(color: AppTheme.cardLavender)),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        labelText: 'اسم المدينة',
+                        hintText: 'مثال: بغداد، البصرة، أربيل',
+                        prefixIcon: const Icon(Icons.location_city),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.search),
+                          onPressed: _searchGyms,
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onSubmitted: (_) => _searchGyms(),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _searchGyms,
+                            icon: const Icon(Icons.search),
+                            label: const Text('بحث'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton(
+                          onPressed: _loadAllGyms,
+                          child: const Text('عرض الكل'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _joinGym,
-                child: const Text('انضمام كنادي مدرب'),
-              ),
-              const SizedBox(height: 18),
-              Text('نواديك الحالية (${data.gyms.length}/4)', style: Theme.of(context).textTheme.titleLarge),
+
+              // Search Results
+              if (_isSearching)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_searchError != null)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(_searchError!,
+                      style: TextStyle(color: Colors.red.shade700)),
+                )
+              else if (_searchResults.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text('نتائج البحث (${_searchResults.length})',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                ..._searchResults.map((gym) => _GymSearchResultCard(
+                      gym: gym,
+                      onJoin: () => _joinGym(gym),
+                      isAlreadyJoined: data.gyms.any((g) => g.gymId == gym.id),
+                    )),
+              ],
+
+              const SizedBox(height: 24),
+              Text('نواديك الحالية (${data.gyms.length}/4)',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(color: AppTheme.cardLime)),
               const SizedBox(height: 8),
               if (data.gyms.isEmpty)
-                const Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(14),
-                    child: Text('أنت غير منضم لأي نادي حالياً.'),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    color: AppTheme.textSecondary.withValues(alpha: 0.1),
                   ),
+                  child: const Text(
+                      'أنت غير منضم لأي نادي حالياً. ابحث عن نادي للانضمام.'),
                 ),
               ...data.gyms.map(
                 (gym) => Card(
                   child: ListTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: AppTheme.cardLime,
+                      child: Icon(Icons.fitness_center, color: Colors.black),
+                    ),
                     title: Text(gym.gymName),
                     subtitle: Text('المدينة: ${gym.city} | عملاء نشطون: ${gym.activeClients}'),
                     trailing: Text('${gym.averageRating.toStringAsFixed(1)} ⭐'),
@@ -92,20 +181,24 @@ class _TrainerGymsPageState extends State<TrainerGymsPage> {
               Text('العملاء النشطون', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               if (data.clients.isEmpty)
-                const Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(14),
-                    child: Text('لا يوجد عملاء نشطون حالياً.'),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    color: AppTheme.textSecondary.withValues(alpha: 0.1),
                   ),
+                  child: const Text('لا يوجد عملاء نشطون حالياً.'),
                 ),
               ...data.clients.map(
                 (client) => Card(
                   child: ListTile(
+                    leading: const CircleAvatar(child: Icon(Icons.person)),
                     title: Text(client.name),
-                    subtitle: Text('المعرف: ${client.id} | النادي: ${client.gymId}'),
+                    subtitle: Text('المعرف: ${client.id}'),
                   ),
                 ),
               ),
+              const SizedBox(height: 80),
             ],
           );
         },
@@ -119,20 +212,77 @@ class _TrainerGymsPageState extends State<TrainerGymsPage> {
     return _TrainerGymsData(gyms: gyms, clients: clients);
   }
 
-  Future<void> _joinGym() async {
-    final gymId = _gymIdController.text.trim();
-    if (gymId.isEmpty) {
-      _showMessage('أدخل Gym ID أولاً');
+  Future<void> _searchGyms() async {
+    final city = _searchController.text.trim();
+    
+    setState(() {
+      _isSearching = true;
+      _searchError = null;
+    });
+
+    try {
+      final results = await _api.fetchPublicGyms(city: city.isEmpty ? null : city);
+      setState(() {
+        _searchResults = results;
+        _isSearching = false;
+        if (results.isEmpty) {
+          _searchError = city.isEmpty 
+              ? 'لا توجد نوادي مسجلة حالياً'
+              : 'لا توجد نوادي في "$city"';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _isSearching = false;
+        _searchError = 'تعذر البحث: $e';
+      });
+    }
+  }
+
+  Future<void> _loadAllGyms() async {
+    _searchController.clear();
+    await _searchGyms();
+  }
+
+  Future<void> _joinGym(GymSummary gym) async {
+    // Check if already at max (4 gyms)
+    final currentData = await _dataFuture;
+    if (!mounted) return;
+    if (currentData.gyms.length >= 4) {
+      _showMessage('لا يمكنك الانضمام لأكثر من 4 نوادٍ');
       return;
     }
 
+    // Confirm join
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تأكيد الانضمام'),
+        content:
+            Text('هل تريد الانضمام إلى "${gym.name}" في ${gym.city} كمدرب؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('انضمام'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
     try {
-      await _api.joinGymAsTrainer(gymId);
+      await _api.joinGymAsTrainer(gym.id);
+      if (!mounted) return;
       _showMessage('تم الانضمام للنادي بنجاح');
-      _gymIdController.clear();
       _reload();
-    } catch (_) {
-      _showMessage('تعذر الانضمام (تأكد من حد 4 نوادٍ أو Gym ID)');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('تعذر الانضمام: $e');
     }
   }
 
@@ -140,7 +290,6 @@ class _TrainerGymsPageState extends State<TrainerGymsPage> {
     setState(() {
       _dataFuture = _loadData();
     });
-
     await _dataFuture;
   }
 
@@ -151,11 +300,114 @@ class _TrainerGymsPageState extends State<TrainerGymsPage> {
   }
 
   void _showMessage(String message) {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+}
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+class _GymSearchResultCard extends StatelessWidget {
+  const _GymSearchResultCard({
+    required this.gym,
+    required this.onJoin,
+    required this.isAlreadyJoined,
+  });
+
+  final GymSummary gym;
+  final VoidCallback onJoin;
+  final bool isAlreadyJoined;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const CircleAvatar(
+                  backgroundColor: AppTheme.cardLavender,
+                  child: Icon(Icons.fitness_center, color: Colors.black),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(gym.name,
+                          style: Theme.of(context).textTheme.titleMedium),
+                      Text(gym.city,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppTheme.textSecondary)),
+                    ],
+                  ),
+                ),
+                Text('${gym.averageRating.toStringAsFixed(1)} ⭐'),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _InfoChip(
+                    icon: Icons.people, label: '${gym.membersCount} أعضاء'),
+                const SizedBox(width: 8),
+                _InfoChip(
+                    icon: Icons.sports, label: '${gym.trainersCount} مدربين'),
+                const Spacer(),
+                if (isAlreadyJoined)
+                  Chip(
+                    label: const Text('منضم'),
+                    backgroundColor: AppTheme.cardLime.withValues(alpha: 0.3),
+                  )
+                else
+                  FilledButton.icon(
+                    onPressed: onJoin,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('انضمام'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.textSecondary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppTheme.textSecondary),
+          const SizedBox(width: 4),
+          Text(label,
+              style:
+                  const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+        ],
+      ),
+    );
   }
 }
 

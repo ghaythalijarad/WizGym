@@ -1,14 +1,17 @@
-# GymOS Architecture (v1 Foundation)
+# WizGym Architecture
 
 ## Vision
 Unified platform for platform admins, gym owners, trainers, and members with Arabic-first UX and role-driven capabilities.
 
 ## System Components
 - Mobile client: Flutter (`apps/mobile`)
-- Backend API: NestJS (`apps/backend`)
+- Backend API: AWS Lambda + TypeScript (`apps/api`) — deployed via AWS SAM
+- Admin dashboard: Static HTML/JS (`apps/admin-dashboard`)
 - Shared contracts: TypeScript interfaces (`packages/contracts`)
-- Data stores: MongoDB + Redis
-- Async/events (target): message broker for notifications and analytics pipelines
+- Data store: DynamoDB single-table (`wizgym-prod-core`)
+- OTP delivery: OTPIQ service (WhatsApp/SMS) via API key in SSM Parameter Store
+
+> `apps/backend` (NestJS/MongoDB) has been removed. The only backend is `apps/api`.
 
 ## Role-Based Capability Matrix
 

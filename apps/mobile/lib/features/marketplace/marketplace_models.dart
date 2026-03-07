@@ -10,6 +10,7 @@ class GymSummary {
     required this.membersCount,
     required this.trainersCount,
     required this.averageRating,
+    this.status = 'ACTIVE',
   });
 
   final String id;
@@ -22,6 +23,7 @@ class GymSummary {
   final int membersCount;
   final int trainersCount;
   final double averageRating;
+  final String status;
 
   factory GymSummary.fromJson(Map<String, dynamic> json) {
     return GymSummary(
@@ -35,6 +37,7 @@ class GymSummary {
       membersCount: _toInt(json['membersCount']),
       trainersCount: _toInt(json['trainersCount']),
       averageRating: _toDouble(json['averageRating']),
+      status: (json['status'] ?? 'ACTIVE').toString(),
     );
   }
 }
@@ -52,6 +55,7 @@ class GymDetail {
     required this.averageRating,
     required this.facilities,
     required this.products,
+    this.subscriptionPlans = const [],
   });
 
   final String id;
@@ -65,10 +69,12 @@ class GymDetail {
   final double averageRating;
   final List<GymFacilityItem> facilities;
   final List<GymProductItem> products;
+  final List<GymSubscriptionPlan> subscriptionPlans;
 
   factory GymDetail.fromJson(Map<String, dynamic> json) {
     final facilitiesRaw = json['facilities'];
     final productsRaw = json['products'];
+    final plansRaw = json['subscriptionPlans'];
 
     return GymDetail(
       id: (json['id'] ?? '').toString(),
@@ -88,6 +94,12 @@ class GymDetail {
       products: productsRaw is List
           ? productsRaw
               .map((item) => GymProductItem.fromJson(item as Map<String, dynamic>))
+              .toList(growable: false)
+          : const [],
+      subscriptionPlans: plansRaw is List
+          ? plansRaw
+              .map((item) =>
+                  GymSubscriptionPlan.fromJson(item as Map<String, dynamic>))
               .toList(growable: false)
           : const [],
     );
@@ -207,6 +219,119 @@ class TrainerClientItem {
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       gymId: (json['gymId'] ?? '').toString(),
+    );
+  }
+}
+
+class OwnerDashboardSummary {
+  OwnerDashboardSummary({
+    required this.totalMembers,
+    required this.totalTrainers,
+    required this.totalGyms,
+    required this.occupancyRate,
+    required this.averageRating,
+  });
+
+  final int totalMembers;
+  final int totalTrainers;
+  final int totalGyms;
+  final double occupancyRate;
+  final double averageRating;
+
+  factory OwnerDashboardSummary.fromJson(Map<String, dynamic> json) {
+    return OwnerDashboardSummary(
+      totalMembers: _toInt(json['totalMembers']),
+      totalTrainers: _toInt(json['totalTrainers']),
+      totalGyms: _toInt(json['totalGyms']),
+      occupancyRate: _toDouble(json['occupancyRate']),
+      averageRating: _toDouble(json['averageRating']),
+    );
+  }
+}
+
+class OwnerRetentionSummary {
+  OwnerRetentionSummary({
+    required this.month,
+    required this.retentionPercent,
+    required this.churnPercent,
+    required this.predictedAtRisk,
+  });
+
+  final String month;
+  final double retentionPercent;
+  final double churnPercent;
+  final int predictedAtRisk;
+
+  factory OwnerRetentionSummary.fromJson(Map<String, dynamic> json) {
+    return OwnerRetentionSummary(
+      month: (json['month'] ?? '').toString(),
+      retentionPercent: _toDouble(json['retentionPercent']),
+      churnPercent: _toDouble(json['churnPercent']),
+      predictedAtRisk: _toInt(json['predictedAtRisk']),
+    );
+  }
+}
+
+class GymSubscriptionPlan {
+  GymSubscriptionPlan({
+    required this.planId,
+    required this.title,
+    required this.durationMonths,
+    required this.price,
+    required this.currency,
+    this.description,
+    this.isActive = true,
+  });
+
+  final String planId;
+  final String title;
+  final int durationMonths;
+  final int price;
+  final String currency;
+  final String? description;
+  final bool isActive;
+
+  factory GymSubscriptionPlan.fromJson(Map<String, dynamic> json) {
+    return GymSubscriptionPlan(
+      planId: (json['planId'] ?? '').toString(),
+      title: (json['title'] ?? '').toString(),
+      durationMonths: _toInt(json['durationMonths']),
+      price: _toInt(json['price']),
+      currency: (json['currency'] ?? 'IQD').toString(),
+      description: json['description']?.toString(),
+      isActive: json['isActive'] != false,
+    );
+  }
+}
+
+class GymMemberItem {
+  GymMemberItem({
+    required this.userId,
+    required this.userName,
+    required this.gymId,
+    required this.status,
+    required this.joinedAt,
+    this.selectedPlanId,
+  });
+
+  final String userId;
+  final String userName;
+  final String gymId;
+  final String status; // PENDING | ACTIVE | REJECTED
+  final String joinedAt;
+  final String? selectedPlanId;
+
+  bool get isPending => status == 'PENDING';
+  bool get isActive => status == 'ACTIVE';
+
+  factory GymMemberItem.fromJson(Map<String, dynamic> json) {
+    return GymMemberItem(
+      userId: (json['userId'] ?? '').toString(),
+      userName: (json['userName'] ?? '').toString(),
+      gymId: (json['gymId'] ?? '').toString(),
+      status: (json['status'] ?? 'PENDING').toString(),
+      joinedAt: (json['joinedAt'] ?? '').toString(),
+      selectedPlanId: json['selectedPlanId']?.toString(),
     );
   }
 }

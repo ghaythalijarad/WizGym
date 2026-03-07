@@ -1,0 +1,91 @@
+# filepath: infra/sam/template.yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: WizGym API - AWS SAM (Lambda + HTTP API)
+
+Globals:
+  Function:
+    Runtime: nodejs18.x
+    MemorySize: 512
+    Timeout: 10
+    Tracing: Active
+    Environment:
+      Variables:
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+        DYNAMODB_TABLE_NAME: wizgym-prod-core
+        GYM_PHOTOS_BUCKET: wizzapp-gym-photos-prod-us-east-1
+        OTPIQ_BASE_URL: https://api.otpiq.com/api
+        OTPIQ_PROVIDER: whatsapp-sms
+
+Resources:
+  ApiGatewayHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        AllowHeaders:
+          - '*'
+
+  WizGymApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../apps/api
+      Handler: dist/handler.handler
+      Events:
+        Health:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGatewayHttpApi
+            Path: /api/v1/health
+            Method: GET
+        Proxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGatewayHttpApi
+            Path: /api/v1/{proxy+}
+            Method: ANY
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: wizgym-prod-core
+        - S3CrudPolicy:
+            BucketName: wizzapp-gym-photos-prod-us-east-1
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+                - ssm:GetParameters
+                - ssm:GetParametersByPath
+              Resource:
+                - arn:aws:ssm:us-east-1:940075378952:parameter/wizgym/prod/*
+            - Effect: Allow
+              Action:
+                - kms:Decrypt
+              Resource:
+                - arn:aws:kms:us-east-1:940075378952:key/*
+              Condition:
+                StringEquals:
+                  kms:ViaService: ssm.us-east-1.amazonaws.com
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/handler.ts
+        Target: es2020
+        Platform: node
+        Sourcemap: true
+        Minify: false
+        External:
+          - '@aws-sdk/*'
+
+Outputs:
+  ApiUrl:
+    Description: HTTP API URL
+    Value: !Sub 'https://${ApiGatewayHttpApi}.execute-api.${AWS::Region}.amazonaws.com'

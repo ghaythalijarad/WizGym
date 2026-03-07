@@ -1,0 +1,10 @@
+{
+  "@@locale": "ar",
+  "appTitle": "GymOS",
+  "profileTitle": "الملف الشخصي",
+  "deleteAccountTitle": "حذف الحساب",
+  "deleteAccountConfirm": "سيتم حذف حسابك وبياناته المرتبطة نهائياً. هل تريد المتابعة؟",
+  "cancel": "إلغاء",
+  "delete": "حذف",
+  "retry": "إعادة المحاولة"
+}

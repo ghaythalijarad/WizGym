@@ -7,7 +7,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:gymos_mobile/app.dart';
+import 'package:gymos_mobile/app_new.dart';
 
 void main() {
   testWidgets('Role selector renders', (WidgetTester tester) async {

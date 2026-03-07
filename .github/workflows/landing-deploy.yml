@@ -1,0 +1,43 @@
+name: Landing Page — Deploy
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "apps/landing/**"
+    workflow_dispatch:
+
+permissions:
+    id-token: write
+    contents: read
+
+env:
+    AWS_REGION: us-east-1
+
+jobs:
+    deploy:
+        name: Deploy Landing Page
+        runs-on: ubuntu-latest
+        environment: production
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Configure AWS credentials (OIDC)
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+                  aws-region: ${{ env.AWS_REGION }}
+
+            - name: Sync to S3
+              run: |
+                  aws s3 sync apps/landing/ s3://${{ secrets.LANDING_S3_BUCKET }}/ \
+                    --delete \
+                    --cache-control "public, max-age=3600"
+
+            - name: Invalidate CloudFront (optional)
+              if: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID != '' }}
+              run: |
+                  aws cloudfront create-invalidation \
+                    --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+                    --paths "/*"

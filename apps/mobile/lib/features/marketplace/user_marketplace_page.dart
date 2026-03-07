@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../core/auth/auth_session.dart';
 import '../../core/models/app_role.dart';
 import 'marketplace_api_service.dart';
 import 'marketplace_models.dart';
 import 'user_marketplace_detail_page.dart';
 
 class UserMarketplacePage extends StatefulWidget {
-  const UserMarketplacePage({super.key});
+  const UserMarketplacePage({super.key, this.session});
+
+  final AuthSession? session;
 
   @override
   State<UserMarketplacePage> createState() => _UserMarketplacePageState();
@@ -238,7 +241,11 @@ class _UserMarketplacePageState extends State<UserMarketplacePage> {
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => UserMarketplaceDetailPage(gymId: gym.id, gymName: gym.name),
+                          builder: (_) => UserMarketplaceDetailPage(
+                            gymId: gym.id,
+                            gymName: gym.name,
+                            session: widget.session,
+                          ),
                         ),
                       );
                     },

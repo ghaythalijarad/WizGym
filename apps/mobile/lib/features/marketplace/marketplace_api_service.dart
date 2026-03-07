@@ -2,14 +2,17 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../core/auth/auth_session.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/app_role.dart';
 import 'marketplace_models.dart';
 
 class MarketplaceApiService {
-  MarketplaceApiService({required this.role}) : _base = Uri.parse(_normalizeBaseUrl(AppConfig.apiBaseUrl));
+  MarketplaceApiService({required this.role, this.session})
+      : _base = Uri.parse(_normalizeBaseUrl(AppConfig.apiBaseUrl));
 
   final AppRole role;
+  final AuthSession? session;
   final Uri _base;
 
   Future<List<GymSummary>> fetchPublicGyms({String? city, String? audience}) async {
@@ -42,6 +45,22 @@ class MarketplaceApiService {
     return data
         .map((item) => GymSummary.fromJson(item as Map<String, dynamic>))
         .toList(growable: false);
+  }
+
+  Future<OwnerDashboardSummary> fetchOwnerDashboard() async {
+    final data = await _getJson('/analytics/owner/dashboard');
+    if (data is! Map<String, dynamic>) {
+      throw const FormatException('Invalid owner dashboard response');
+    }
+    return OwnerDashboardSummary.fromJson(data);
+  }
+
+  Future<OwnerRetentionSummary> fetchOwnerRetention() async {
+    final data = await _getJson('/analytics/owner/retention');
+    if (data is! Map<String, dynamic>) {
+      throw const FormatException('Invalid owner retention response');
+    }
+    return OwnerRetentionSummary.fromJson(data);
   }
 
   Future<GymDetail> fetchGymDetail(String gymId) async {
@@ -95,12 +114,113 @@ class MarketplaceApiService {
         .toList(growable: false);
   }
 
-  Future<Map<String, dynamic>> joinGymAsUser(String gymId) {
-    return _postJson('/gyms/$gymId/join', <String, dynamic>{});
+  Future<Map<String, dynamic>> joinGymAsUser(String gymId, {String? planId}) {
+    return _postJson('/gyms/$gymId/join', <String, dynamic>{
+      if (planId != null) 'planId': planId,
+    });
   }
 
   Future<Map<String, dynamic>> joinGymAsTrainer(String gymId) {
     return _postJson('/gyms/$gymId/trainers/join', <String, dynamic>{});
+  }
+
+  Future<Map<String, dynamic>> createGym({
+    required String name,
+    required String city,
+    String? description,
+    String? coverImageUrl,
+    String audience = 'MIXED',
+    List<String> amenities = const [],
+    List<Map<String, dynamic>> subscriptionPlans = const [],
+  }) {
+    return _postJson('/gyms', {
+      'name': name.trim(),
+      'city': city.trim(),
+      if (description != null && description.trim().isNotEmpty)
+        'description': description.trim(),
+      if (coverImageUrl != null && coverImageUrl.trim().isNotEmpty)
+        'coverImageUrl': coverImageUrl.trim(),
+      'audience': audience,
+      'amenities': amenities,
+      'subscriptionPlans': subscriptionPlans,
+    });
+  }
+
+  Future<List<GymMemberItem>> fetchGymMembers(String gymId,
+      {String? status}) async {
+    final query =
+        status != null ? '?status=${Uri.encodeQueryComponent(status)}' : '';
+    final data = await _getJson('/gyms/$gymId/members$query');
+    if (data is! List) {
+      throw const FormatException('Invalid members response');
+    }
+    return data
+        .map((item) => GymMemberItem.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<Map<String, dynamic>> respondToMember({
+    required String gymId,
+    required String memberId,
+    required String action, // 'APPROVE' | 'REJECT'
+  }) {
+    return _patchJson('/gyms/$gymId/members/$memberId', {'action': action});
+  }
+
+  Future<Map<String, dynamic>> createSubscriptionPlan({
+    required String gymId,
+    required String title,
+    required int durationMonths,
+    required int price,
+    String currency = 'IQD',
+    String? description,
+  }) {
+    return _postJson('/gyms/$gymId/subscription-plans', {
+      'title': title.trim(),
+      'durationMonths': durationMonths,
+      'price': price,
+      'currency': currency,
+      if (description != null && description.trim().isNotEmpty)
+        'description': description.trim(),
+    });
+  }
+
+  Future<List<GymSubscriptionPlan>> fetchSubscriptionPlans(String gymId) async {
+    final data = await _getJson('/gyms/$gymId/subscription-plans');
+    if (data is! List) {
+      throw const FormatException('Invalid subscription plans response');
+    }
+    return data
+        .map((item) =>
+            GymSubscriptionPlan.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<Map<String, dynamic>> deleteSubscriptionPlan({
+    required String gymId,
+    required String planId,
+  }) {
+    return _deleteJson('/gyms/$gymId/subscription-plans/$planId');
+  }
+
+  Future<Map<String, dynamic>> updateSubscriptionPlan({
+    required String gymId,
+    required String planId,
+    String? title,
+    int? durationMonths,
+    int? price,
+    String? currency,
+    String? description,
+    bool? isActive,
+  }) {
+    return _patchJson('/gyms/$gymId/subscription-plans/$planId', {
+      if (title != null) 'title': title.trim(),
+      if (durationMonths != null) 'durationMonths': durationMonths,
+      if (price != null) 'price': price,
+      if (currency != null) 'currency': currency,
+      if (description != null) 'description': description.trim(),
+      if (isActive != null) 'isActive': isActive,
+    });
   }
 
   Future<Map<String, dynamic>> hireTrainer(String gymId, String trainerId) {
@@ -208,6 +328,20 @@ class MarketplaceApiService {
     return {'data': data};
   }
 
+  Future<Map<String, dynamic>> _deleteJson(String path) async {
+    final response = await http.delete(
+      _resolve(path),
+      headers: _headers,
+    );
+
+    final data = _decodeResponse(response);
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+
+    return {'data': data};
+  }
+
   Uri _resolve(String path) {
     final normalized = path.startsWith('/') ? path.substring(1) : path;
     return _base.resolve(normalized);
@@ -215,9 +349,12 @@ class MarketplaceApiService {
 
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
-        'x-user-role': _roleHeader(role),
-        'x-user-id': _defaultUserId(role),
-        'x-user-name': _defaultUserName(role),
+        if (session?.token != null && session!.token.isNotEmpty)
+          'Authorization': 'Bearer ${session!.token}',
+        'x-user-role':
+            (session?.role.apiValue ?? _roleHeader(role)).toUpperCase(),
+        'x-user-id': session?.userId ?? _defaultUserId(role),
+        'x-user-name': session?.displayName ?? _defaultUserName(role),
       };
 
   dynamic _decodeResponse(http.Response response) {
@@ -237,6 +374,7 @@ class MarketplaceApiService {
       case AppRole.trainer:
         return 'TRAINER';
       case AppRole.user:
+      case AppRole.trainee:
         return 'USER';
     }
   }
@@ -250,6 +388,7 @@ class MarketplaceApiService {
       case AppRole.trainer:
         return 'trainer-1';
       case AppRole.user:
+      case AppRole.trainee:
         return 'user-1';
     }
   }
@@ -263,6 +402,7 @@ class MarketplaceApiService {
       case AppRole.trainer:
         return 'Trainer';
       case AppRole.user:
+      case AppRole.trainee:
         return 'Member';
     }
   }

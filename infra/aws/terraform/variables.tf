@@ -207,3 +207,15 @@ variable "common_tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "github_repo" {
+  description = "GitHub repository in org/repo format (e.g., ghaythallaheebi/WizGymProd)."
+  type        = string
+  default     = "ghaythallaheebi/WizGymProd"
+}
+
+variable "landing_s3_bucket" {
+  description = "S3 bucket name for the landing page."
+  type        = string
+  default     = "wizgym-landing-prod"
+}

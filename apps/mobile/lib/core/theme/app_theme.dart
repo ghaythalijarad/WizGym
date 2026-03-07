@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
+  // ── Brand palette ──────────────────────────────────────────────
+  static const Color cardLime = Color(0xFF00A68C); // primary green
+  static const Color cardPink = Color(0xFFFF5C7A); // accent warm / danger
+  static const Color cardLavender = Color(0xFF7C83FF); // accent cool / purple
+  static const Color cardSurfaceHigh =
+      Color(0xFF1A2336); // dark elevated surface
+  static const Color textPrimary = Color(0xFFEAF0FB); // near-white
+  static const Color textSecondary = Color(0xFF8A96A8); // muted grey
+
   static ThemeData get lightTheme {
     const ink = Color(0xFF0B1220);
     const accent = Color(0xFF00A68C);
@@ -65,7 +74,7 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surface.withValues(alpha: 0.92),
         indicatorColor: accent.withValues(alpha: 0.14),
-        labelTextStyle: WidgetStatePropertyAll(
+        labelTextStyle: const WidgetStatePropertyAll(
           TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,

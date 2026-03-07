@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>تسجيل الدخول — WizGym Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&family=Tajawal:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="config.js"></script>
+  <style>
+    .login-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0E0E12 0%, #1a1a24 100%);
+      padding: 24px;
+    }
+    .login-card {
+      background: rgba(30, 30, 40, 0.95);
+      border: 1px solid rgba(202, 252, 1, 0.1);
+      border-radius: 24px;
+      padding: 48px;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+    .login-brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .login-brand-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #CAFC01 0%, #a8d400 100%);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-brand-icon .material-icons-round {
+      font-size: 28px;
+      color: #0E0E12;
+    }
+    .login-brand-name {
+      font-size: 28px;
+      font-weight: 800;
+      color: #CAFC01;
+      font-family: 'Inter', sans-serif;
+    }
+    .login-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .login-subtitle {
+      font-size: 14px;
+      color: #999;
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #ddd;
+      margin-bottom: 8px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 14px 16px;
+      background: rgba(20, 20, 30, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: #fff;
+      font-size: 15px;
+      font-family: 'Tajawal', sans-serif;
+      transition: all 0.2s;
+      box-sizing: border-box;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #CAFC01;
+      background: rgba(30, 30, 40, 0.9);
+    }
+    .login-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #CAFC01 0%, #a8d400 100%);
+      border: none;
+      border-radius: 12px;
+      color: #0E0E12;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: 'Tajawal', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .login-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(202, 252, 1, 0.3);
+    }
+    .login-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .error-msg {
+      background: rgba(244, 67, 54, 0.1);
+      border: 1px solid rgba(244, 67, 54, 0.3);
+      border-radius: 12px;
+      padding: 12px 16px;
+      color: #f44336;
+      font-size: 14px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .error-msg.show {
+      display: block;
+    }
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(14, 14, 18, 0.3);
+      border-top-color: #0E0E12;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="login-brand-icon">
+          <span class="material-icons-round">fitness_center</span>
+        </div>
+        <span class="login-brand-name">WizGym</span>
+      </div>
+      
+      <h1 class="login-title">لوحة تحكم المدير</h1>
+      <p class="login-subtitle">سجّل دخولك للوصول إلى النظام</p>
+      
+      <div id="errorMsg" class="error-msg"></div>
+      
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label" for="email">البريد الإلكتروني</label>
+          <input 
+            type="email" 
+            id="email" 
+            class="form-input" 
+            placeholder="admin@wizgym.app"
+            required
+            autocomplete="email"
+          />
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="password">كلمة السر</label>
+          <input 
+            type="password" 
+            id="password" 
+            class="form-input" 
+            placeholder="••••••••"
+            required
+            autocomplete="current-password"
+          />
+        </div>
+        
+        <button type="submit" class="login-btn" id="loginBtn">
+          <span id="loginText">تسجيل الدخول</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const form = document.getElementById('loginForm');
+      const emailInput = document.getElementById('email');
+      const passwordInput = document.getElementById('password');
+      const loginBtn = document.getElementById('loginBtn');
+      const loginText = document.getElementById('loginText');
+      const errorMsg = document.getElementById('errorMsg');
+
+      // Read Cognito config from config.js
+      const config = window.WIZGYM_CONFIG?.cognito || {};
+      const COGNITO_REGION = config.region || 'eu-north-1';
+      const COGNITO_USER_POOL_ID = config.userPoolId || 'eu-north-1_XXXXXXXXX';
+      const COGNITO_CLIENT_ID = config.clientId || 'XXXXXXXXXXXXXXXXXXXXXXXXXX';
+      const COGNITO_DOMAIN = config.domain || 'wizgym-admin';
+
+      function showError(message) {
+        errorMsg.textContent = message;
+        errorMsg.classList.add('show');
+      }
+
+      function hideError() {
+        errorMsg.classList.remove('show');
+      }
+
+      function setLoading(loading) {
+        loginBtn.disabled = loading;
+        if (loading) {
+          loginText.innerHTML = '<div class="spinner"></div>';
+        } else {
+          loginText.textContent = 'تسجيل الدخول';
+        }
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideError();
+
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+
+        if (!email || !password) {
+          showError('الرجاء إدخال البريد الإلكتروني وكلمة السر');
+          return;
+        }
+
+        setLoading(true);
+
+        try {
+          // For production: Use AWS Amplify or amazon-cognito-identity-js
+          // For now, we'll use a simple fetch to Cognito's InitiateAuth endpoint
+          
+          const authResponse = await fetch(`https://cognito-idp.${COGNITO_REGION}.amazonaws.com/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-amz-json-1.1',
+              'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
+            },
+            body: JSON.stringify({
+              AuthFlow: 'USER_PASSWORD_AUTH',
+              ClientId: COGNITO_CLIENT_ID,
+              AuthParameters: {
+                USERNAME: email,
+                PASSWORD: password,
+              },
+            }),
+          });
+
+          if (!authResponse.ok) {
+            const error = await authResponse.json();
+            throw new Error(error.message || 'فشل تسجيل الدخول');
+          }
+
+          const authData = await authResponse.json();
+          const idToken = authData.AuthenticationResult?.IdToken;
+          const accessToken = authData.AuthenticationResult?.AccessToken;
+          const refreshToken = authData.AuthenticationResult?.RefreshToken;
+
+          if (!idToken) {
+            throw new Error('لم يتم الحصول على توكن صالح');
+          }
+
+          // Store tokens securely
+          sessionStorage.setItem('wizgym_id_token', idToken);
+          sessionStorage.setItem('wizgym_access_token', accessToken);
+          if (refreshToken) {
+            sessionStorage.setItem('wizgym_refresh_token', refreshToken);
+          }
+
+          // Redirect to dashboard
+          window.location.href = 'index.html';
+
+        } catch (err) {
+          console.error('Login error:', err);
+          showError(err.message || 'حدث خطأ أثناء تسجيل الدخول. الرجاء المحاولة مرة أخرى.');
+        } finally {
+          setLoading(false);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

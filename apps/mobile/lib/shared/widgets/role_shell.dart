@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../core/auth/auth_session.dart';
 import '../../core/models/app_role.dart';
 import '../../features/admin/admin_home_page.dart';
 import '../../features/admin/gym_approval_page.dart';
@@ -10,14 +11,22 @@ import '../../features/marketplace/owner_studio_page.dart';
 import '../../features/marketplace/trainer_gyms_page.dart';
 import '../../features/marketplace/user_marketplace_page.dart';
 import '../../features/owner/owner_home_page.dart';
+import '../../features/owner/owner_members_page.dart';
+import '../../features/owner/owner_plans_page.dart';
 import '../../features/trainer/trainer_home_page.dart';
+import '../../features/trainer/trainer_plans_page.dart';
+import '../../features/trainer/trainer_subscriptions_page.dart';
 import '../../features/user/user_home_page.dart';
+import '../../features/plans/user_plans_page.dart';
+import '../../features/profile/role_profile_page.dart';
 import 'app_background.dart';
 
 class RoleShell extends StatefulWidget {
-  const RoleShell({super.key, required this.role});
+  const RoleShell({super.key, required this.role, this.onLogout, this.session});
 
   final AppRole role;
+  final VoidCallback? onLogout;
+  final AuthSession? session;
 
   @override
   State<RoleShell> createState() => _RoleShellState();
@@ -28,7 +37,7 @@ class _RoleShellState extends State<RoleShell> {
 
   @override
   Widget build(BuildContext context) {
-    final config = _tabsForRole(widget.role);
+    final config = _tabsForRole(widget.role, widget.session);
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -59,7 +68,7 @@ class _RoleShellState extends State<RoleShell> {
     );
   }
 
-  _RoleTabsConfig _tabsForRole(AppRole role) {
+  _RoleTabsConfig _tabsForRole(AppRole role, AuthSession? session) {
     switch (role) {
       case AppRole.admin:
         return const _RoleTabsConfig(
@@ -77,18 +86,20 @@ class _RoleShellState extends State<RoleShell> {
           ],
         );
       case AppRole.owner:
-        return const _RoleTabsConfig(
+        return _RoleTabsConfig(
           pages: [
-            OwnerHomePage(),
-            OwnerStudioPage(),
-            _SimpleListPage(title: 'إدارة الاشتراكات', items: ['تجديد', 'تجميد', 'ترقية']),
-            _SimpleListPage(title: 'التحليلات', items: ['معدل الحضور', 'نسبة التجديد', 'الإيراد اليومي']),
+            OwnerHomePage(session: session),
+            const OwnerStudioPage(),
+            OwnerMembersPage(session: session),
+            OwnerPlansPage(session: session),
           ],
-          destinations: [
+          destinations: const [
             NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'الرئيسية'),
             NavigationDestination(icon: Icon(Icons.storefront_outlined), label: 'الاستوديو'),
-            NavigationDestination(icon: Icon(Icons.card_membership_outlined), label: 'الاشتراكات'),
-            NavigationDestination(icon: Icon(Icons.analytics_outlined), label: 'التحليلات'),
+            NavigationDestination(
+                icon: Icon(Icons.group_outlined), label: 'الأعضاء'),
+            NavigationDestination(
+                icon: Icon(Icons.card_membership_outlined), label: 'الخطط'),
           ],
         );
       case AppRole.trainer:
@@ -96,28 +107,50 @@ class _RoleShellState extends State<RoleShell> {
           pages: [
             TrainerHomePage(),
             TrainerGymsPage(),
-            _SimpleListPage(title: 'الخطط', items: ['Push/Pull', 'خسارة وزن', 'زيادة كتلة']),
-            _SimpleListPage(title: 'الرسائل', items: ['تذكير جلسة 6:00', 'تقرير أداء الأسبوع']),
+            TrainerSubscriptionsPage(),
+            TrainerPlansPage(),
           ],
           destinations: [
             NavigationDestination(icon: Icon(Icons.today_outlined), label: 'اليوم'),
             NavigationDestination(icon: Icon(Icons.apartment_outlined), label: 'نواديي'),
-            NavigationDestination(icon: Icon(Icons.fitness_center_outlined), label: 'الخطط'),
-            NavigationDestination(icon: Icon(Icons.chat_bubble_outline), label: 'الرسائل'),
+            NavigationDestination(
+                icon: Icon(Icons.group_outlined), label: 'المتدربون'),
+            NavigationDestination(
+                icon: Icon(Icons.fitness_center_outlined), label: 'الخطط'),
           ],
         );
       case AppRole.user:
-        return const _RoleTabsConfig(
+        return _RoleTabsConfig(
           pages: [
-            UserHomePage(),
-            UserMarketplacePage(),
-            _SimpleListPage(title: 'التمارين', items: ['صدر + تراي', 'ظهر + باي', 'كارديو']),
-            _SimpleListPage(title: 'الملف الشخصي', items: ['الهدف: لياقة عامة', 'الوزن: 72kg']),
+            const UserHomePage(),
+            UserMarketplacePage(session: session),
+            UserPlansPage(session: session),
+            RoleProfilePage(role: role, session: session),
           ],
-          destinations: [
+          destinations: const [
+            NavigationDestination(
+                icon: Icon(Icons.home_outlined), label: 'الرئيسية'),
+            NavigationDestination(
+                icon: Icon(Icons.search_outlined), label: 'النوادي'),
+            NavigationDestination(
+                icon: Icon(Icons.fitness_center_outlined), label: 'خططي'),
+            NavigationDestination(
+                icon: Icon(Icons.person_outline), label: 'الملف'),
+          ],
+        );
+      case AppRole.trainee:
+        return _RoleTabsConfig(
+          pages: [
+            const UserHomePage(),
+            UserMarketplacePage(session: session),
+            UserPlansPage(session: session),
+            RoleProfilePage(role: role, session: session),
+          ],
+          destinations: const [
             NavigationDestination(icon: Icon(Icons.home_outlined), label: 'الرئيسية'),
             NavigationDestination(icon: Icon(Icons.search_outlined), label: 'النوادي'),
-            NavigationDestination(icon: Icon(Icons.sports_gymnastics_outlined), label: 'التمارين'),
+            NavigationDestination(
+                icon: Icon(Icons.fitness_center_outlined), label: 'خططي'),
             NavigationDestination(icon: Icon(Icons.person_outline), label: 'الملف'),
           ],
         );

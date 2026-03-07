@@ -1,6 +1,7 @@
 class AppConfig {
   static const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:3000/api/v1/',
+    defaultValue:
+        'https://3u10v51mvk.execute-api.us-east-1.amazonaws.com/api/v1/',
   );
 }

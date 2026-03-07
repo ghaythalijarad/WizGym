@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WizGym — منصة إدارة النوادي الرياضية</title>
+  <meta name="description" content="WizGym — المنصة المتكاملة لإدارة نوادي اللياقة في العراق. إدارة ذكية للمالك والمدرب والمتدرب." />
+  <meta name="theme-color" content="#0E0E12" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar" id="navbar">
+    <div class="container nav-inner">
+      <a href="#" class="nav-brand">
+        <div class="nav-brand-icon"><span class="material-icons-round">fitness_center</span></div>
+        <span class="nav-brand-name">WizGym</span>
+      </a>
+      <div class="nav-links" id="navLinks">
+        <a href="#features">المميزات</a>
+        <a href="#roles">الأدوار</a>
+        <a href="#pricing">الأسعار</a>
+        <a href="#faq">الأسئلة الشائعة</a>
+      </div>
+      <div class="nav-actions">
+        <a href="#download" class="btn btn-lime">حمّل التطبيق</a>
+        <button class="mobile-menu-btn" id="mobileMenuBtn">
+          <span class="material-icons-round">menu</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero" id="hero">
+    <div class="hero-glow"></div>
+    <div class="container hero-inner">
+      <div class="hero-text">
+        <span class="hero-badge">🚀 أول منصة عراقية متكاملة لإدارة النوادي</span>
+        <h1 class="hero-title">أدِر ناديك الرياضي <span class="hero-accent">بذكاء</span></h1>
+        <p class="hero-subtitle">منصة واحدة تجمع المالك والمدرب والمتدرب. إدارة الاشتراكات، تتبع الأداء، خطط التدريب، وسوق النوادي — كل ذلك في تطبيق واحد.</p>
+        <div class="hero-buttons">
+          <a href="#download" class="btn btn-lime btn-lg"><span class="material-icons-round">download</span> حمّل مجاناً</a>
+          <a href="#features" class="btn btn-outline btn-lg"><span class="material-icons-round">play_circle</span> اكتشف المميزات</a>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat"><span class="hero-stat-value">18</span><span class="hero-stat-label">محافظة عراقية</span></div>
+          <div class="hero-stat"><span class="hero-stat-value">3</span><span class="hero-stat-label">أدوار مستخدم</span></div>
+          <div class="hero-stat"><span class="hero-stat-value">∞</span><span class="hero-stat-label">خطط تدريب</span></div>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="phone-mockup">
+          <div class="phone-screen">
+            <div class="mock-header">
+              <span class="mock-greeting">مرحباً 👋</span>
+              <span class="mock-title" style="color:#CAFC01">WizGym</span>
+            </div>
+            <div class="mock-card lime">
+              <span class="material-icons-round">fitness_center</span>
+              <div><div class="mock-card-value">12</div><div class="mock-card-label">نادي مسجل</div></div>
+            </div>
+            <div class="mock-card lavender">
+              <span class="material-icons-round">people</span>
+              <div><div class="mock-card-value">348</div><div class="mock-card-label">متدرب نشط</div></div>
+            </div>
+            <div class="mock-card pink">
+              <span class="material-icons-round">trending_up</span>
+              <div><div class="mock-card-value">94%</div><div class="mock-card-label">نسبة الاحتفاظ</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-badge">المميزات</span>
+        <h2 class="section-title">كل ما تحتاجه في <span class="accent">تطبيق واحد</span></h2>
+        <p class="section-subtitle">مصممة خصيصاً لنوادي اللياقة العراقية</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon lime"><span class="material-icons-round">store</span></div>
+          <h3>سوق النوادي</h3>
+          <p>اكتشف النوادي القريبة منك، تصفح الصور والتقييمات، وانضم بنقرة واحدة.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon lavender"><span class="material-icons-round">assignment</span></div>
+          <h3>خطط التدريب</h3>
+          <p>اكتب خطتك الخاصة أو استلم خطة مخصصة من مدربك مباشرة في التطبيق.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon pink"><span class="material-icons-round">analytics</span></div>
+          <h3>تحليلات الأداء</h3>
+          <p>لوحة بيانات ذكية للمالك تعرض الاحتفاظ، معدل التسرب، ونمو الأعضاء.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon lime"><span class="material-icons-round">card_membership</span></div>
+          <h3>إدارة الاشتراكات</h3>
+          <p>تتبع اشتراكات النوادي، مواعيد التجديد، وحالة الدفع بلمحة واحدة.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon lavender"><span class="material-icons-round">people</span></div>
+          <h3>إدارة المدربين</h3>
+          <p>المدرب ينضم لأربع نوادٍ كحد أقصى، يتابع عملاءه ويرسل خطط التدريب.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon pink"><span class="material-icons-round">admin_panel_settings</span></div>
+          <h3>لوحة المدير</h3>
+          <p>اعتماد النوادي، إدارة الاشتراكات، ومراقبة المنصة من لوحة تحكم ويب.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Roles -->
+  <section class="section section-dark" id="roles">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-badge">الأدوار</span>
+        <h2 class="section-title">تجربة مخصصة <span class="accent">لكل مستخدم</span></h2>
+        <p class="section-subtitle">ثلاثة أدوار رئيسية بواجهة موحدة</p>
+      </div>
+      <div class="roles-grid">
+        <div class="role-card lime-border">
+          <div class="role-icon lime"><span class="material-icons-round">business</span></div>
+          <h3>مالك النادي</h3>
+          <ul>
+            <li>إدارة النوادي والاستوديو</li>
+            <li>تحليلات الأعمال المتقدمة</li>
+            <li>إدارة الاشتراكات والمدفوعات</li>
+            <li>إضافة المرافق والمنتجات</li>
+            <li>مراقبة المدربين والأعضاء</li>
+          </ul>
+        </div>
+        <div class="role-card lavender-border">
+          <div class="role-icon lavender"><span class="material-icons-round">sports_martial_arts</span></div>
+          <h3>المدرب</h3>
+          <ul>
+            <li>الانضمام لـ 4 نوادٍ كحد أقصى</li>
+            <li>إدارة العملاء النشطين</li>
+            <li>إرسال خطط تدريب مخصصة</li>
+            <li>عرض التقييمات والمراجعات</li>
+            <li>متابعة الأداء والنتائج</li>
+          </ul>
+        </div>
+        <div class="role-card pink-border">
+          <div class="role-icon pink"><span class="material-icons-round">directions_run</span></div>
+          <h3>المتدرب</h3>
+          <ul>
+            <li>تصفح سوق النوادي والانضمام</li>
+            <li>استلام خطط من المدرب</li>
+            <li>كتابة خطط تدريب شخصية</li>
+            <li>تقييم النوادي والمدربين</li>
+            <li>توظيف مدرب خاص</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section class="section" id="pricing">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-badge">الأسعار</span>
+        <h2 class="section-title">خطط <span class="accent">مناسبة للجميع</span></h2>
+        <p class="section-subtitle">أسعار بالدينار العراقي — بدون رسوم مخفية</p>
+      </div>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <div class="pricing-badge">مبتدئ</div>
+          <div class="pricing-price">
+            <span class="price-value">499,000</span>
+            <span class="price-unit">د.ع / شهرياً</span>
+          </div>
+          <ul class="pricing-features">
+            <li><span class="material-icons-round check">check_circle</span> نادي واحد</li>
+            <li><span class="material-icons-round check">check_circle</span> حتى 50 عضو</li>
+            <li><span class="material-icons-round check">check_circle</span> لوحة تحكم أساسية</li>
+            <li><span class="material-icons-round check">check_circle</span> دعم بالبريد</li>
+            <li class="disabled"><span class="material-icons-round">cancel</span> تحليلات متقدمة</li>
+            <li class="disabled"><span class="material-icons-round">cancel</span> أولوية الدعم الفني</li>
+          </ul>
+          <a href="#download" class="btn btn-outline btn-block">ابدأ الآن</a>
+        </div>
+        <div class="pricing-card featured">
+          <div class="pricing-popular">الأكثر شعبية</div>
+          <div class="pricing-badge">نمو</div>
+          <div class="pricing-price">
+            <span class="price-value">799,000</span>
+            <span class="price-unit">د.ع / شهرياً</span>
+          </div>
+          <ul class="pricing-features">
+            <li><span class="material-icons-round check">check_circle</span> حتى 3 نوادي</li>
+            <li><span class="material-icons-round check">check_circle</span> حتى 200 عضو</li>
+            <li><span class="material-icons-round check">check_circle</span> تحليلات متقدمة</li>
+            <li><span class="material-icons-round check">check_circle</span> إدارة المدربين</li>
+            <li><span class="material-icons-round check">check_circle</span> دعم واتساب</li>
+            <li class="disabled"><span class="material-icons-round">cancel</span> API مخصص</li>
+          </ul>
+          <a href="#download" class="btn btn-lime btn-block">ابدأ الآن</a>
+        </div>
+        <div class="pricing-card">
+          <div class="pricing-badge">احترافي</div>
+          <div class="pricing-price">
+            <span class="price-value">1,299,000</span>
+            <span class="price-unit">د.ع / شهرياً</span>
+          </div>
+          <ul class="pricing-features">
+            <li><span class="material-icons-round check">check_circle</span> نوادي غير محدودة</li>
+            <li><span class="material-icons-round check">check_circle</span> أعضاء غير محدودين</li>
+            <li><span class="material-icons-round check">check_circle</span> كل مميزات النمو</li>
+            <li><span class="material-icons-round check">check_circle</span> API مخصص</li>
+            <li><span class="material-icons-round check">check_circle</span> أولوية الدعم الفني</li>
+            <li><span class="material-icons-round check">check_circle</span> مدير حساب مخصص</li>
+          </ul>
+          <a href="#download" class="btn btn-outline btn-block">ابدأ الآن</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="section section-dark" id="faq">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-badge">الأسئلة الشائعة</span>
+        <h2 class="section-title">أجوبة <span class="accent">سريعة</span></h2>
+      </div>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>هل التطبيق متاح على iOS و Android؟</summary>
+          <p>نعم، WizGym متاح على كل من App Store و Google Play. يمكنك تحميله مجاناً والبدء فوراً.</p>
+        </details>
+        <details class="faq-item">
+          <summary>هل يدعم التطبيق اللغة العربية بالكامل؟</summary>
+          <p>بالتأكيد! التطبيق مصمم بالعربية أولاً (Arabic-first) مع دعم اتجاه RTL الكامل في كل الشاشات.</p>
+        </details>
+        <details class="faq-item">
+          <summary>كم عدد النوادي التي يمكنني إدارتها؟</summary>
+          <p>يعتمد على خطة الاشتراك. خطة المبتدئ تدعم نادي واحد، وخطة النمو حتى 3 نوادي، والاحترافي غير محدود.</p>
+        </details>
+        <details class="faq-item">
+          <summary>هل يمكن للمدرب الانضمام لأكثر من نادي؟</summary>
+          <p>نعم، يمكن للمدرب الانضمام لأربع نوادي كحد أقصى في نفس الوقت وإدارة عملائه في كل نادي.</p>
+        </details>
+        <details class="faq-item">
+          <summary>ما هي طرق الدفع المتاحة؟</summary>
+          <p>ندعم الدفع بالدينار العراقي عبر التحويل البنكي، ZainCash، وFastPay. نعمل على إضافة طرق دفع إلكتروني إضافية.</p>
+        </details>
+        <details class="faq-item">
+          <summary>هل بيانات ناديي آمنة؟</summary>
+          <p>نعم، نستخدم تشفير SSL، قواعد بيانات MongoDB المؤمنة على AWS، ومصادقة OTP عبر الهاتف لضمان أمان بياناتك.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- Download / CTA -->
+  <section class="section cta-section" id="download">
+    <div class="container cta-inner">
+      <div class="cta-glow"></div>
+      <h2 class="cta-title">جاهز لتحويل ناديك؟</h2>
+      <p class="cta-subtitle">حمّل WizGym الآن وابدأ إدارة ناديك بالطريقة الذكية.</p>
+      <div class="cta-buttons">
+        <a href="#" class="store-btn">
+          <img src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/ar-ae?size=250x83" alt="App Store" height="52" />
+        </a>
+        <a href="#" class="store-btn">
+          <img src="https://play.google.com/intl/en_us/badges/static/images/badges/ar_badge_web_generic.png" alt="Google Play" height="52" style="filter:brightness(0) invert(1);" />
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <div class="nav-brand-icon"><span class="material-icons-round">fitness_center</span></div>
+        <span class="nav-brand-name" style="font-size:1.1rem">WizGym</span>
+      </div>
+      <div class="footer-links">
+        <a href="#features">المميزات</a>
+        <a href="#pricing">الأسعار</a>
+        <a href="#faq">الأسئلة</a>
+        <a href="mailto:support@wizgym.app">الدعم</a>
+      </div>
+      <div class="footer-copy">© 2026 WizGym. جميع الحقوق محفوظة.</div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('mobileMenuBtn').addEventListener('click', function() {
+      document.getElementById('navLinks').classList.toggle('open');
+    });
+    document.querySelectorAll('a[href^="#"]').forEach(function(a) {
+      a.addEventListener('click', function(e) {
+        var target = document.querySelector(a.getAttribute('href'));
+        if (target) {
+          e.preventDefault();
+          document.getElementById('navLinks').classList.remove('open');
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+    window.addEventListener('scroll', function() {
+      document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 40);
+    });
+  </script>
+</body>
+</html>

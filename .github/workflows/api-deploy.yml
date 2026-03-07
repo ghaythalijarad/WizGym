@@ -1,0 +1,98 @@
+name: API — Build & Deploy
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "apps/api/**"
+            - "infra/sam/**"
+    pull_request:
+        branches: [main]
+        paths:
+            - "apps/api/**"
+            - "infra/sam/**"
+    workflow_dispatch:
+
+permissions:
+    id-token: write # Required for OIDC auth with AWS
+    contents: read
+
+env:
+    AWS_REGION: us-east-1
+    SAM_STACK_NAME: sam-app
+
+jobs:
+    # ─── Lint & Type-check ─────────────────────────────────────────────────
+    check:
+        name: TypeScript Check
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "18"
+                  cache: "npm"
+                  cache-dependency-path: apps/api/package-lock.json
+
+            - name: Install dependencies
+              working-directory: apps/api
+              run: npm ci
+
+            - name: TypeScript type-check
+              working-directory: apps/api
+              run: npx tsc --noEmit
+
+    # ─── Build & Deploy (only on main push) ────────────────────────────────
+    deploy:
+        name: SAM Build & Deploy
+        needs: check
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        runs-on: ubuntu-latest
+        environment: production
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "18"
+                  cache: "npm"
+                  cache-dependency-path: apps/api/package-lock.json
+
+            - uses: aws-actions/setup-sam@v2
+              with:
+                  use-installer: true
+
+            - name: Configure AWS credentials (OIDC)
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+                  aws-region: ${{ env.AWS_REGION }}
+
+            - name: SAM Build
+              working-directory: infra/sam
+              run: sam build
+
+            - name: SAM Deploy
+              working-directory: infra/sam
+              run: |
+                  sam deploy \
+                    --stack-name ${{ env.SAM_STACK_NAME }} \
+                    --region ${{ env.AWS_REGION }} \
+                    --no-confirm-changeset \
+                    --no-fail-on-empty-changeset \
+                    --capabilities CAPABILITY_IAM \
+                    --resolve-s3
+
+            - name: Smoke test — health endpoint
+              run: |
+                  API_URL=$(aws cloudformation describe-stacks \
+                    --stack-name ${{ env.SAM_STACK_NAME }} \
+                    --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
+                    --output text)
+                  echo "API_URL=$API_URL"
+                  RESPONSE=$(curl -sf "$API_URL/api/v1/health")
+                  echo "$RESPONSE"
+                  echo "$RESPONSE" | grep -q '"status":"ok"' || (echo "Health check FAILED" && exit 1)
+                  echo "✅ Health check passed"

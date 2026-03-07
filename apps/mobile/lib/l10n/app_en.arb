@@ -1,0 +1,10 @@
+{
+  "@@locale": "en",
+  "appTitle": "GymOS",
+  "profileTitle": "Profile",
+  "deleteAccountTitle": "Delete account",
+  "deleteAccountConfirm": "Your account and related data will be permanently deleted. Continue?",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "retry": "Retry"
+}

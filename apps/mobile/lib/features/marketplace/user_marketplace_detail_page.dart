@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
 
+import '../../core/auth/auth_session.dart';
+import '../../core/auth/auth_session_store.dart';
 import '../../core/models/app_role.dart';
+import '../plans/plans_api_service.dart';
 import 'marketplace_api_service.dart';
 import 'marketplace_models.dart';
 
 class UserMarketplaceDetailPage extends StatefulWidget {
-  const UserMarketplaceDetailPage({super.key, required this.gymId, required this.gymName});
+  const UserMarketplaceDetailPage({
+    super.key,
+    required this.gymId,
+    required this.gymName,
+    this.session,
+  });
 
   final String gymId;
   final String gymName;
+  final AuthSession? session;
 
   @override
   State<UserMarketplaceDetailPage> createState() => _UserMarketplaceDetailPageState();
@@ -16,13 +25,39 @@ class UserMarketplaceDetailPage extends StatefulWidget {
 
 class _UserMarketplaceDetailPageState extends State<UserMarketplaceDetailPage> {
   late final MarketplaceApiService _api;
+  PlansApiService? _plansApi;
+  final AuthSessionStore _sessionStore = AuthSessionStore();
   late Future<_GymDetailViewData> _dataFuture;
+  // trainerId -> subscription status ('PENDING'|'APPROVED'|null)
+  final Map<String, String?> _subStatus = {};
+  // gym join status: null | 'PENDING' | 'ACTIVE'
+  String? _joinStatus;
 
   @override
   void initState() {
     super.initState();
-    _api = MarketplaceApiService(role: AppRole.user);
+    _api = MarketplaceApiService(role: AppRole.user, session: widget.session);
     _dataFuture = _loadData();
+    _initPlansApi();
+  }
+
+  Future<void> _initPlansApi() async {
+    final session = widget.session ?? await _sessionStore.load();
+    final api = PlansApiService(role: AppRole.trainee, session: session);
+    // Pre-load subscription statuses
+    try {
+      final subs = await api.fetchMySubscriptions();
+      if (mounted) {
+        setState(() {
+          _plansApi = api;
+          for (final s in subs) {
+            _subStatus[s.trainerId] = s.status;
+          }
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _plansApi = api);
+    }
   }
 
   @override
@@ -79,13 +114,58 @@ class _UserMarketplaceDetailPageState extends State<UserMarketplaceDetailPage> {
                   ),
                 ],
                 const SizedBox(height: 14),
+                // ── Subscription Plans ──
+                if (data.detail.subscriptionPlans.isNotEmpty) ...[
+                  Text('خطط الاشتراك',
+                      style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 8),
+                  ...data.detail.subscriptionPlans.map(
+                    (plan) => Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          child: Text('${plan.durationMonths}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        title: Text(plan.title),
+                        subtitle: Text(
+                          '${plan.durationMonths} ${plan.durationMonths == 1 ? 'شهر' : 'أشهر'}',
+                        ),
+                        trailing: Text(
+                          '${plan.price} ${plan.currency}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        onTap: () => _joinGymWithPlan(plan.planId),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton(
-                        onPressed: _joinGym,
-                        child: const Text('انضمام للنادي'),
-                      ),
+                      child: _joinStatus == 'PENDING'
+                          ? OutlinedButton.icon(
+                              onPressed: null,
+                              icon: const Icon(Icons.hourglass_top, size: 16),
+                              label: const Text('بانتظار موافقة المالك'),
+                            )
+                          : _joinStatus == 'ACTIVE'
+                              ? FilledButton.icon(
+                                  onPressed: null,
+                                  icon: const Icon(Icons.check, size: 16),
+                                  label: const Text('عضو في النادي'),
+                                )
+                              : ElevatedButton(
+                                  onPressed: _joinGym,
+                                  child: const Text('انضمام للنادي'),
+                                ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -139,36 +219,93 @@ class _UserMarketplaceDetailPageState extends State<UserMarketplaceDetailPage> {
   }
 
   Widget _buildTrainerCard(GymTrainerItem trainer) {
+    final status = _subStatus[trainer.trainerId];
+    final isApproved = status == 'APPROVED';
+    final isPending = status == 'PENDING';
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(trainer.displayName, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 6),
-            Text('التقييم: ${trainer.averageRating.toStringAsFixed(1)} ⭐'),
-            Text('عملاء نشطون: ${trainer.activeClients}'),
-            if (trainer.hiredByRequester)
-              Text(
-                'مدربك الحالي',
-                style: TextStyle(color: Theme.of(context).colorScheme.primary),
+            Row(
+              children: [
+                CircleAvatar(
+                  child: Text(
+                    trainer.displayName.isNotEmpty
+                        ? trainer.displayName[0].toUpperCase()
+                        : '؟',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(trainer.displayName,
+                          style: Theme.of(context).textTheme.titleMedium),
+                      Text(
+                        'التقييم: ${trainer.averageRating.toStringAsFixed(1)} ⭐  |  عملاء: ${trainer.activeClients}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (isApproved) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 16),
+                    SizedBox(width: 6),
+                    Text('مدربك المعتمد',
+                        style: TextStyle(
+                            color: Colors.green, fontWeight: FontWeight.w600)),
+                  ],
+                ),
               ),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => _rateTrainer(trainer.trainerId),
-                    child: const Text('تقييم المدرب'),
+                    child: const Text('تقييم'),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => _hireTrainer(trainer.trainerId),
-                    child: const Text('توظيفه'),
-                  ),
+                  child: isApproved
+                      ? FilledButton.icon(
+                          onPressed: null,
+                          icon: const Icon(Icons.check, size: 16),
+                          label: const Text('مشترك'),
+                        )
+                      : isPending
+                          ? OutlinedButton.icon(
+                              onPressed: null,
+                              icon: const Icon(Icons.hourglass_top, size: 16),
+                              label: const Text('بانتظار الموافقة'),
+                            )
+                          : FilledButton.icon(
+                              onPressed: () =>
+                                  _subscribeToTrainer(trainer.trainerId),
+                              icon: const Icon(Icons.person_add_outlined,
+                                  size: 16),
+                              label: const Text('طلب اشتراك'),
+                            ),
                 ),
               ],
             ),
@@ -205,21 +342,65 @@ class _UserMarketplaceDetailPageState extends State<UserMarketplaceDetailPage> {
 
   Future<void> _joinGym() async {
     try {
-      await _api.joinGymAsUser(widget.gymId);
-      _showMessage('تم الانضمام بنجاح');
+      final result = await _api.joinGymAsUser(widget.gymId);
+      final status = result['status']?.toString() ?? 'PENDING';
+      setState(() => _joinStatus = status);
+      _showMessage(status == 'PENDING'
+          ? 'تم إرسال طلب الانضمام — بانتظار موافقة المالك'
+          : 'تم الانضمام بنجاح');
       _reload();
     } catch (_) {
       _showMessage('تعذر الانضمام');
     }
   }
 
-  Future<void> _hireTrainer(String trainerId) async {
+  Future<void> _joinGymWithPlan(String planId) async {
     try {
-      await _api.hireTrainer(widget.gymId, trainerId);
-      _showMessage('تم توظيف المدرب بنجاح');
+      final result = await _api.joinGymAsUser(widget.gymId, planId: planId);
+      final status = result['status']?.toString() ?? 'PENDING';
+      setState(() => _joinStatus = status);
+      _showMessage(status == 'PENDING'
+          ? 'تم إرسال طلب الانضمام مع الخطة — بانتظار موافقة المالك'
+          : 'تم الانضمام بنجاح');
       _reload();
     } catch (_) {
-      _showMessage('تعذر توظيف المدرب');
+      _showMessage('تعذر الانضمام');
+    }
+  }
+
+  Future<void> _subscribeToTrainer(String trainerId) async {
+    final api = _plansApi;
+    if (api == null) {
+      _showMessage('جاري التحضير، حاول مجدداً');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('طلب اشتراك'),
+        content: const Text(
+            'سيتم إرسال طلب اشتراكك إلى المدرب. بعد موافقته يمكنه إرسال خطط تدريبية لك.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('إرسال الطلب'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await api.subscribeToTrainer(trainerId: trainerId, gymId: widget.gymId);
+      setState(() => _subStatus[trainerId] = 'PENDING');
+      _showMessage('تم إرسال طلب الاشتراك بنجاح ✓');
+    } catch (e) {
+      _showMessage('تعذر إرسال الطلب: $e');
     }
   }
 

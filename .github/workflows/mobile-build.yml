@@ -1,0 +1,109 @@
+name: Mobile — Analyze & Build
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "apps/mobile/**"
+    pull_request:
+        branches: [main]
+        paths:
+            - "apps/mobile/**"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    # ─── Flutter Analyze ───────────────────────────────────────────────────
+    analyze:
+        name: Flutter Analyze
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: subosito/flutter-action@v2
+              with:
+                  flutter-version: "3.29.x"
+                  channel: stable
+                  cache: true
+
+            - name: Install dependencies
+              working-directory: apps/mobile
+              run: flutter pub get
+
+            - name: Generate localizations
+              working-directory: apps/mobile
+              run: flutter gen-l10n || true
+
+            - name: Analyze
+              working-directory: apps/mobile
+              run: flutter analyze --no-fatal-infos
+
+    # ─── Android APK Build (on main push) ─────────────────────────────────
+    build-android:
+        name: Build Android APK
+        needs: analyze
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-java@v4
+              with:
+                  distribution: "temurin"
+                  java-version: "17"
+
+            - uses: subosito/flutter-action@v2
+              with:
+                  flutter-version: "3.29.x"
+                  channel: stable
+                  cache: true
+
+            - name: Install dependencies
+              working-directory: apps/mobile
+              run: flutter pub get
+
+            - name: Build APK (release)
+              working-directory: apps/mobile
+              run: |
+                  flutter build apk --release \
+                    --dart-define=API_BASE_URL=https://3u10v51mvk.execute-api.us-east-1.amazonaws.com/api/v1/
+
+            - name: Upload APK artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: wizgym-android-apk
+                  path: apps/mobile/build/app/outputs/flutter-apk/app-release.apk
+                  retention-days: 30
+
+    # ─── iOS Build Check (on main push) ───────────────────────────────────
+    build-ios:
+        name: Build iOS (no-codesign)
+        needs: analyze
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        runs-on: macos-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: subosito/flutter-action@v2
+              with:
+                  flutter-version: "3.29.x"
+                  channel: stable
+                  cache: true
+
+            - name: Install dependencies
+              working-directory: apps/mobile
+              run: flutter pub get
+
+            - name: Install CocoaPods
+              working-directory: apps/mobile/ios
+              run: pod install --repo-update
+
+            - name: Build iOS (no codesign)
+              working-directory: apps/mobile
+              run: |
+                  flutter build ios --release --no-codesign \
+                    --dart-define=API_BASE_URL=https://3u10v51mvk.execute-api.us-east-1.amazonaws.com/api/v1/
