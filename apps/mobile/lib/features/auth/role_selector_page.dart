@@ -86,13 +86,6 @@ class RoleSelectorPage extends StatelessWidget {
                         accent: scheme.tertiary,
                         onTap: () => _open(context, AppRole.owner),
                       ),
-                      _RoleCard(
-                        title: AppRole.admin.labelAr,
-                        subtitle: 'اعتماد النوادي وإدارة الاشتراكات',
-                        icon: Icons.verified_user_outlined,
-                        accent: scheme.onSurface,
-                        onTap: () => _open(context, AppRole.admin),
-                      ),
                     ],
                   ),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
