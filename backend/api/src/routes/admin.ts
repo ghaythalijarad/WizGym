@@ -47,6 +47,41 @@ function signAdminToken(phone: string, secret: string): string {
 
 function normalizePhone(p: string) { return p.replace(/^\+/, ""); }
 
+/** Verify an HS256 admin JWT. Returns the payload or throws. */
+async function verifyAdminToken(authHeader: string | undefined): Promise<{
+  sub: string; phone: string; role: string; exp: number;
+}> {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    throw new Error("MISSING_TOKEN");
+  }
+  const token = authHeader.slice(7).trim();
+  const parts = token.split(".");
+  if (parts.length !== 3) throw new Error("INVALID_TOKEN");
+  const [header, body, sig] = parts;
+
+  const secret = await getJwtSecret();
+  if (!secret) throw new Error("SECRET_UNAVAILABLE");
+
+  const expected = createHmac("sha256", secret)
+    .update(`${header}.${body}`)
+    .digest("base64url");
+  if (expected !== sig) throw new Error("INVALID_SIGNATURE");
+
+  const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+  if (payload.exp < Math.floor(Date.now() / 1000)) throw new Error("TOKEN_EXPIRED");
+  if (payload.role !== "superadmin") throw new Error("INSUFFICIENT_ROLE");
+
+  return payload;
+}
+
+function unauthorizedResponse(message: string): APIGatewayProxyResultV2 {
+  return {
+    statusCode: 401,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+  };
+}
+
 /** Convert local Iraqi 07XXXXXXXXX → international 9647XXXXXXXXX for OTPIQ */
 function toInternational(phone: string): string {
   const p = normalizePhone(phone);
@@ -205,6 +240,17 @@ export async function handleAdmin(
       return { statusCode: 500, headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: "خطأ في التحقق" }) };
     }
+  }
+
+  // ── JWT guard — every route below this point requires a valid admin token ──
+  try {
+    await verifyAdminToken(event.headers?.["authorization"] || event.headers?.["Authorization"]);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "UNAUTHORIZED";
+    if (msg === "TOKEN_EXPIRED") {
+      return unauthorizedResponse("انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجدداً");
+    }
+    return unauthorizedResponse("غير مصرح — يرجى تسجيل الدخول");
   }
 
   // GET /admin/dashboard

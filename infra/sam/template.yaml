@@ -5,7 +5,7 @@ Description: WizGym API - AWS SAM (Lambda + HTTP API)
 
 Globals:
   Function:
-    Runtime: nodejs18.x
+    Runtime: nodejs22.x
     MemorySize: 512
     Timeout: 10
     Tracing: Active
@@ -85,7 +85,42 @@ Resources:
         External:
           - '@aws-sdk/*'
 
+  # ── Subscription Expiry Checker (EventBridge cron, nightly 01:00 UTC) ──────
+  SubscriptionExpiryCheckerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../backend/api
+      Handler: dist/handlers/expiry-checker.handler
+      Description: Nightly job — deactivates GYM SUBSCRIPTION items whose expiresAt has passed
+      MemorySize: 256
+      Timeout: 60
+      Events:
+        NightlyExpiry:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 1 * * ? *)   # 01:00 UTC every day
+            Description: Deactivate expired gym subscriptions
+            Enabled: true
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: wizgym-prod-core
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/handlers/expiry-checker.ts
+        Target: es2020
+        Platform: node
+        Sourcemap: true
+        Minify: false
+        External:
+          - '@aws-sdk/*'
+
 Outputs:
   ApiUrl:
     Description: HTTP API URL
     Value: !Sub 'https://${ApiGatewayHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
+
+  ExpiryCheckerFunctionArn:
+    Description: ARN of the subscription expiry checker Lambda
+    Value: !GetAtt SubscriptionExpiryCheckerFunction.Arn
