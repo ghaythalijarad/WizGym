@@ -1,0 +1,1 @@
+940075378952	arn:aws:sts::940075378952:assumed-role/AWSReservedSSO_AdministratorAccess_5c32bd2ba2dbc780/Ghaythali	AROA5VYG35EECCGKSHE4Q:Ghaythali

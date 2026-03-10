@@ -37,7 +37,7 @@ Resources:
   WizGymApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../../apps/api
+      CodeUri: ../../backend/api
       Handler: dist/handler.handler
       Events:
         Health:

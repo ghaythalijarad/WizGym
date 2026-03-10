@@ -7,12 +7,9 @@ dist
 coverage
 npm-debug.log*
 
-# Flutter
-.dart_tool
-.packages
-.pub-cache
-.pub
-build
+# Flutter / Dart
+**/.dart_tool/
+**/build/
 
 # IDE
 .vscode

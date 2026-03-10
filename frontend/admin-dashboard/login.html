@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>تسجيل الدخول — WizGym Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&family=Tajawal:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="config.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Tajawal',sans-serif;background:#0E0E12;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{background:rgba(30,30,40,0.97);border:1px solid rgba(202,252,1,0.12);border-radius:24px;padding:48px 40px;width:100%;max-width:440px;box-shadow:0 24px 64px rgba(0,0,0,0.55)}
+    .brand{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:32px}
+    .brand-icon{width:52px;height:52px;background:linear-gradient(135deg,#CAFC01,#a8d400);border-radius:14px;display:flex;align-items:center;justify-content:center}
+    .brand-icon .material-icons-round{font-size:30px;color:#0E0E12}
+    .brand-name{font-size:30px;font-weight:800;color:#CAFC01;font-family:'Inter',sans-serif;letter-spacing:-0.5px}
+    h1{font-size:22px;font-weight:700;color:#fff;text-align:center;margin-bottom:6px}
+    .subtitle{font-size:13px;color:#888;text-align:center;margin-bottom:28px}
+
+    /* steps */
+    .step{display:none}.step.active{display:block}
+
+    .label{display:block;font-size:13px;font-weight:600;color:#ccc;margin-bottom:8px}
+    .input-wrap{position:relative;margin-bottom:20px}
+    .input-wrap .material-icons-round{position:absolute;top:50%;transform:translateY(-50%);right:14px;color:#666;font-size:20px;pointer-events:none}
+    input[type=tel],input[type=text]{width:100%;padding:14px 44px 14px 16px;background:rgba(15,15,22,0.9);border:1.5px solid rgba(255,255,255,0.1);border-radius:12px;color:#fff;font-size:16px;font-family:'Tajawal',sans-serif;transition:border-color .2s,background .2s;letter-spacing:1px}
+    input[type=tel]:focus,input[type=text]:focus{outline:none;border-color:#CAFC01;background:rgba(20,20,30,1)}
+    input::placeholder{color:#444;letter-spacing:0}
+
+    /* OTP boxes */
+    .otp-row{display:flex;gap:10px;justify-content:center;margin-bottom:20px;direction:ltr}
+    .otp-box{width:52px;height:60px;background:rgba(15,15,22,0.9);border:1.5px solid rgba(255,255,255,0.1);border-radius:12px;color:#fff;font-size:24px;font-weight:700;text-align:center;font-family:'Inter',sans-serif;transition:border-color .2s,background .2s}
+    .otp-box:focus{outline:none;border-color:#CAFC01;background:rgba(20,20,30,1)}
+
+    .phone-preview{text-align:center;margin-bottom:20px;color:#888;font-size:13px}
+    .phone-preview strong{color:#CAFC01}
+
+    .btn-main{width:100%;padding:15px;background:linear-gradient(135deg,#CAFC01,#a8d400);border:none;border-radius:12px;color:#0E0E12;font-size:16px;font-weight:700;font-family:'Tajawal',sans-serif;cursor:pointer;transition:transform .15s,box-shadow .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+    .btn-main:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 24px rgba(202,252,1,0.28)}
+    .btn-main:disabled{opacity:.55;cursor:not-allowed;transform:none}
+
+    .btn-ghost{background:none;border:none;color:#CAFC01;font-size:13px;font-family:'Tajawal',sans-serif;cursor:pointer;margin-top:16px;display:block;width:100%;text-align:center;padding:8px}
+    .btn-ghost:disabled{opacity:.45;cursor:not-allowed}
+    .btn-ghost:hover:not(:disabled){text-decoration:underline}
+
+    .error{background:rgba(244,67,54,.1);border:1px solid rgba(244,67,54,.3);border-radius:12px;padding:12px 16px;color:#f44336;font-size:13px;margin-bottom:16px;display:none}
+    .error.show{display:block}
+    .success{background:rgba(76,175,80,.1);border:1px solid rgba(76,175,80,.3);border-radius:12px;padding:12px 16px;color:#4caf50;font-size:13px;margin-bottom:16px;display:none}
+    .success.show{display:block}
+
+    .spinner{width:20px;height:20px;border:3px solid rgba(14,14,18,.35);border-top-color:#0E0E12;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .countdown{font-size:12px;color:#666;text-align:center;margin-top:6px}
+    .countdown span{color:#CAFC01;font-weight:700}
+
+    /* provider badge */
+    .provider-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.2);border-radius:20px;padding:4px 10px;font-size:12px;color:#25d366;margin-bottom:24px;margin-right:auto;margin-left:auto;width:fit-content;display:flex;justify-content:center}
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <div class="brand-icon"><span class="material-icons-round">fitness_center</span></div>
+    <span class="brand-name">WizGym</span>
+  </div>
+  <h1>لوحة تحكم المدير</h1>
+  <p class="subtitle">تسجيل الدخول عبر رقم الهاتف</p>
+
+  <!-- ── STEP 1: enter phone ── -->
+  <div id="step1" class="step active">
+    <div class="provider-badge">
+      <span class="material-icons-round" style="font-size:16px">chat</span>
+      سيصلك الرمز عبر واتساب / SMS
+    </div>
+    <div id="err1" class="error"></div>
+    <label class="label" for="phoneInput">رقم الهاتف</label>
+    <div class="input-wrap">
+      <span class="material-icons-round">phone</span>
+      <input type="tel" id="phoneInput" placeholder="07XXXXXXXXX" autocomplete="tel" inputmode="numeric" />
+    </div>
+    <button class="btn-main" id="sendBtn" type="button">
+      <span id="sendText">إرسال رمز التحقق</span>
+    </button>
+  </div>
+
+  <!-- ── STEP 2: enter OTP ── -->
+  <div id="step2" class="step">
+    <div id="err2" class="error"></div>
+    <div id="suc2" class="success"></div>
+    <p class="phone-preview">أدخل الرمز المُرسَل إلى <strong id="phoneLbl"></strong></p>
+    <div class="otp-row" id="otpRow">
+      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+      <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+    </div>
+    <button class="btn-main" id="verifyBtn" type="button" disabled>
+      <span id="verifyText">تحقق وادخل</span>
+    </button>
+    <div class="countdown" id="countdownWrap">إعادة الإرسال بعد <span id="countdownSec">60</span> ثانية</div>
+    <button class="btn-ghost" id="resendBtn" type="button" disabled>إعادة إرسال الرمز</button>
+    <button class="btn-ghost" id="backBtn" type="button" style="color:#888;margin-top:4px">← تغيير رقم الهاتف</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const API = (window.WIZGYM_CONFIG?.api?.baseUrl) || 'https://3u10v51mvk.execute-api.us-east-1.amazonaws.com/api/v1';
+
+  // ── elements ──
+  const step1 = document.getElementById('step1');
+  const step2 = document.getElementById('step2');
+  const phoneInput = document.getElementById('phoneInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const sendText = document.getElementById('sendText');
+  const err1 = document.getElementById('err1');
+
+  const otpBoxes = Array.from(document.querySelectorAll('.otp-box'));
+  const verifyBtn = document.getElementById('verifyBtn');
+  const verifyText = document.getElementById('verifyText');
+  const err2 = document.getElementById('err2');
+  const suc2 = document.getElementById('suc2');
+  const phoneLbl = document.getElementById('phoneLbl');
+  const resendBtn = document.getElementById('resendBtn');
+  const backBtn = document.getElementById('backBtn');
+  const countdownWrap = document.getElementById('countdownWrap');
+  const countdownSec = document.getElementById('countdownSec');
+
+  let sessionId = '';
+  let countdownTimer = null;
+
+  // ── helpers ──
+  function showErr(el, msg) { el.textContent = msg; el.classList.add('show'); }
+  function hideErr(el) { el.classList.remove('show'); }
+  function showSuc(el, msg) { el.textContent = msg; el.classList.add('show'); }
+
+  function setLoading(btn, textEl, loading, label) {
+    btn.disabled = loading;
+    if (loading) {
+      textEl.innerHTML = '<div class="spinner"></div>';
+    } else {
+      textEl.textContent = label;
+    }
+  }
+
+  function startCountdown(secs) {
+    let s = secs;
+    resendBtn.disabled = true;
+    countdownWrap.style.display = 'block';
+    countdownSec.textContent = s;
+    clearInterval(countdownTimer);
+    countdownTimer = setInterval(() => {
+      s--;
+      countdownSec.textContent = s;
+      if (s <= 0) {
+        clearInterval(countdownTimer);
+        countdownWrap.style.display = 'none';
+        resendBtn.disabled = false;
+      }
+    }, 1000);
+  }
+
+  function getOTP() { return otpBoxes.map(b => b.value).join(''); }
+
+  function checkOTPFull() {
+    verifyBtn.disabled = getOTP().length < 6;
+  }
+
+  // ── OTP box keyboard navigation ──
+  otpBoxes.forEach((box, i) => {
+    box.addEventListener('input', e => {
+      // allow only digits
+      box.value = box.value.replace(/\D/g, '').slice(-1);
+      if (box.value && i < otpBoxes.length - 1) otpBoxes[i + 1].focus();
+      checkOTPFull();
+    });
+    box.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !box.value && i > 0) {
+        otpBoxes[i - 1].focus();
+        otpBoxes[i - 1].value = '';
+        checkOTPFull();
+      }
+    });
+    box.addEventListener('paste', e => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+      [...text].slice(0, 6).forEach((ch, j) => {
+        if (otpBoxes[i + j]) otpBoxes[i + j].value = ch;
+      });
+      const nextEmpty = otpBoxes.findIndex(b => !b.value);
+      (nextEmpty >= 0 ? otpBoxes[nextEmpty] : otpBoxes[5]).focus();
+      checkOTPFull();
+    });
+  });
+
+  // ── SEND OTP ──
+  async function sendOTP(phone) {
+    hideErr(err1);
+    setLoading(sendBtn, sendText, true, '');
+    try {
+      const res = await fetch(`${API}/admin/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: phone }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'فشل الإرسال');
+
+      sessionId = data.sessionId;
+      phoneLbl.textContent = phone;
+      step1.classList.remove('active');
+      step2.classList.add('active');
+      otpBoxes.forEach(b => b.value = '');
+      verifyBtn.disabled = true;
+      hideErr(err2);
+      hideErr(suc2.classList.contains('show') ? suc2 : err2);
+      suc2.classList.remove('show');
+      startCountdown(60);
+      setTimeout(() => otpBoxes[0].focus(), 100);
+    } catch (e) {
+      showErr(err1, e.message);
+    } finally {
+      setLoading(sendBtn, sendText, false, 'إرسال رمز التحقق');
+    }
+  }
+
+  sendBtn.addEventListener('click', () => {
+    const phone = phoneInput.value.trim();
+    if (!phone) { showErr(err1, 'الرجاء إدخال رقم الهاتف'); return; }
+    sendOTP(phone);
+  });
+
+  phoneInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendBtn.click(); });
+
+  // ── VERIFY OTP ──
+  verifyBtn.addEventListener('click', async () => {
+    const otp = getOTP();
+    if (otp.length < 6) return;
+    hideErr(err2);
+    setLoading(verifyBtn, verifyText, true, '');
+    try {
+      const res = await fetch(`${API}/admin/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, otp }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'الرمز غير صحيح');
+
+      // Store token and redirect
+      sessionStorage.setItem('wizgym_id_token', data.token);
+      sessionStorage.setItem('wizgym_access_token', data.token);
+      showSuc(suc2, '✓ تم التحقق — جارٍ التوجيه...');
+      clearInterval(countdownTimer);
+      setTimeout(() => { window.location.href = 'index.html'; }, 800);
+    } catch (e) {
+      showErr(err2, e.message);
+      otpBoxes.forEach(b => b.value = '');
+      otpBoxes[0].focus();
+      verifyBtn.disabled = true;
+    } finally {
+      setLoading(verifyBtn, verifyText, false, 'تحقق وادخل');
+    }
+  });
+
+  // ── RESEND ──
+  resendBtn.addEventListener('click', () => {
+    const phone = phoneInput.value.trim();
+    if (!phone) return;
+    hideErr(err2);
+    suc2.classList.remove('show');
+    otpBoxes.forEach(b => b.value = '');
+    verifyBtn.disabled = true;
+    sendOTP(phone);
+  });
+
+  // ── BACK ──
+  backBtn.addEventListener('click', () => {
+    clearInterval(countdownTimer);
+    step2.classList.remove('active');
+    step1.classList.add('active');
+    hideErr(err1);
+  });
+})();
+</script>
+</body>
+</html>

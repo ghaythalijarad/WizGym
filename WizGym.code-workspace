@@ -6,19 +6,19 @@
     },
     {
       "name": "Frontend (Mobile)",
-      "path": "apps/mobile"
+      "path": "frontend/mobile"
     },
     {
       "name": "Dashboard (Admin)",
-      "path": "apps/admin-dashboard"
+      "path": "frontend/admin-dashboard"
     },
     {
       "name": "Backend (API)",
-      "path": "apps/api"
+      "path": "backend/api"
     },
     {
       "name": "🌐 Landing Page",
-      "path": "apps/landing"
+      "path": "frontend/landing"
     },
     {
       "name": "📦 Contracts",
@@ -81,7 +81,7 @@
     "[json]": {
       "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
-    "typescript.tsdk": "apps/api/node_modules/typescript/lib",
+    "typescript.tsdk": "backend/api/node_modules/typescript/lib",
     "typescript.enablePromptUseWorkspaceTsdk": true
   },
   "extensions": {
@@ -106,31 +106,31 @@
         "name": "📱 Flutter: iOS Simulator",
         "type": "dart",
         "request": "launch",
-        "program": "apps/mobile/lib/main.dart",
-        "cwd": "apps/mobile"
+        "program": "frontend/mobile/lib/main.dart",
+        "cwd": "frontend/mobile"
       },
       {
         "name": "📱 Flutter: iOS Device (Release)",
         "type": "dart",
         "request": "launch",
-        "program": "apps/mobile/lib/main.dart",
-        "cwd": "apps/mobile",
+        "program": "frontend/mobile/lib/main.dart",
+        "cwd": "frontend/mobile",
         "flutterMode": "release"
       },
       {
         "name": "📱 Flutter: Android",
         "type": "dart",
         "request": "launch",
-        "program": "apps/mobile/lib/main.dart",
-        "cwd": "apps/mobile",
+        "program": "frontend/mobile/lib/main.dart",
+        "cwd": "frontend/mobile",
         "args": ["-d", "android"]
       },
       {
         "name": "📱 Flutter: Profile Mode",
         "type": "dart",
         "request": "launch",
-        "program": "apps/mobile/lib/main.dart",
-        "cwd": "apps/mobile",
+        "program": "frontend/mobile/lib/main.dart",
+        "cwd": "frontend/mobile",
         "flutterMode": "profile"
       }
     ]
@@ -297,7 +297,7 @@
       {
         "label": "Deploy: Full (Contracts → API → Admin)",
         "type": "shell",
-        "command": "bash -lc 'set -euo pipefail; cd packages/contracts && npm run build; cd ../../apps/api && npm run build; cd ../../infra/sam && sam build && sam deploy --config-env prod; cd ../../apps/admin-dashboard && bash deploy.sh'",
+        "command": "bash -lc 'set -euo pipefail; cd packages/contracts && npm run build; cd ../../backend/api && npm run build; cd ../../infra/sam && sam build && sam deploy --config-env prod; cd ../../frontend/admin-dashboard && bash deploy.sh'",
         "options": {
           "cwd": "${workspaceFolder:🏠 Root}"
         },
