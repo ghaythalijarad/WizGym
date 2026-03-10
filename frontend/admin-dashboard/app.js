@@ -11,14 +11,15 @@
   );
 
   // Get authentication token
+  // Get authentication token — admin JWT stored by login.html
   function getAuthToken() {
-    return sessionStorage.getItem('wizgym_id_token');
+    return sessionStorage.getItem('wizgym_admin_token');
   }
 
   function getHeaders() {
     const token = getAuthToken();
-    
-    // Development mode: use simple headers
+
+    // Development mode: allow unauthenticated access with fake headers
     if (IS_DEV && !token) {
       return {
         'Content-Type': 'application/json',
@@ -27,8 +28,8 @@
         'x-user-name': 'Platform Admin (Dev Mode)',
       };
     }
-    
-    // Production mode: use Cognito token
+
+    // Production: send admin JWT
     return {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
@@ -46,9 +47,7 @@
 
   // Logout function
   function logout() {
-    sessionStorage.removeItem('wizgym_id_token');
-    sessionStorage.removeItem('wizgym_access_token');
-    sessionStorage.removeItem('wizgym_refresh_token');
+    sessionStorage.removeItem('wizgym_admin_token');
     window.location.href = 'login.html';
   }
 
@@ -101,13 +100,13 @@
   // Display user info from token (if available)
   function displayUserInfo() {
     const token = getAuthToken();
-    if (token && !IS_DEV) {
+    if (token) {
       try {
-        // Decode JWT to get user info (base64 decode the payload)
         const payload = JSON.parse(atob(token.split('.')[1]));
         const adminNameEl = document.getElementById('adminName');
-        if (adminNameEl && payload.email) {
-          adminNameEl.textContent = payload.email;
+        if (adminNameEl) {
+          // Show phone number from JWT (admin login is phone-based)
+          adminNameEl.textContent = payload.phone || payload.sub || 'مشرف';
         }
       } catch (err) {
         console.error('Failed to decode token:', err);

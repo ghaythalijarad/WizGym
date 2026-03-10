@@ -256,9 +256,8 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'الرمز غير صحيح');
 
-      // Store token and redirect
-      sessionStorage.setItem('wizgym_id_token', data.token);
-      sessionStorage.setItem('wizgym_access_token', data.token);
+      // Store admin JWT and redirect
+      sessionStorage.setItem('wizgym_admin_token', data.token);
       showSuc(suc2, '✓ تم التحقق — جارٍ التوجيه...');
       clearInterval(countdownTimer);
       setTimeout(() => { window.location.href = 'index.html'; }, 800);
