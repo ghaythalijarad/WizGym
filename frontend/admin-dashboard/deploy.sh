@@ -29,7 +29,7 @@ if [ -z "$COGNITO_USER_POOL_ID" ] || [ -z "$COGNITO_CLIENT_ID" ]; then
 fi
 
 # Navigate to dashboard directory
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")"
 
 # Update config.js with production values
 echo -e "${BLUE}📝 Updating config.js with production values...${NC}"

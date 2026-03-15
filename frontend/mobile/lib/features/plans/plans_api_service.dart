@@ -34,6 +34,17 @@ class PlansApiService {
     await _postJson('/plans/me', {'content': content.trim()});
   }
 
+  Future<void> deleteTraineePlan(String planId) async {
+    final response = await http.delete(
+      _resolve('/plans/me/${Uri.encodeComponent(planId)}'),
+      headers: _headers,
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+          'Failed to delete plan: ${response.statusCode} ${response.body}');
+    }
+  }
+
   Future<void> sendTrainerPlan({
     required String traineeUserId,
     required String content,
@@ -89,9 +100,74 @@ class PlansApiService {
   Future<void> subscribeToTrainer({
     required String trainerId,
     String gymId = '',
+    String? planId,
   }) async {
     final encoded = Uri.encodeComponent(trainerId);
-    await _postJson('/trainers/$encoded/subscribe', {'gymId': gymId});
+    await _postJson('/trainers/$encoded/subscribe', {
+      'gymId': gymId,
+      if (planId != null) 'planId': planId,
+    });
+  }
+
+  /// Cancel / withdraw a PENDING trainer subscription request.
+  /// The backend rejects this if the subscription is already APPROVED.
+  Future<void> cancelTrainerSubscription({required String trainerId}) async {
+    final encoded = Uri.encodeComponent(trainerId);
+    await _deleteJson('/trainers/$encoded/subscribe');
+  }
+
+  // ── Trainer subscription plans ──────────────────────────────────────────────
+
+  Future<List<TrainerSubscriptionPlan>> fetchMySubscriptionPlans() async {
+    final data = await _getJson('/trainers/me/subscription-plans');
+    if (data is! Map<String, dynamic>) return const [];
+    final plans = data['plans'];
+    if (plans is! List) return const [];
+    return plans
+        .map((p) => TrainerSubscriptionPlan.fromJson(p as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<TrainerSubscriptionPlan> createSubscriptionPlan({
+    required String name,
+    required double price,
+    required int durationMonths,
+    String description = '',
+  }) async {
+    final data = await _postJson('/trainers/me/subscription-plans', {
+      'title': name,
+      'price': price,
+      'durationMonths': durationMonths,
+      'description': description,
+    });
+    if (data is Map<String, dynamic>) {
+      return TrainerSubscriptionPlan(
+        planId: data['planId']?.toString() ?? '',
+        title: name,
+        price: price,
+        durationMonths: durationMonths,
+        description: description,
+      );
+    }
+    throw const FormatException('Invalid plan response');
+  }
+
+  Future<void> deleteSubscriptionPlan(String planId) async {
+    await _deleteJson(
+        '/trainers/me/subscription-plans/${Uri.encodeComponent(planId)}');
+  }
+
+  /// Public — trainee fetches trainer's available plans before subscribing.
+  Future<List<TrainerSubscriptionPlan>> fetchTrainerSubscriptionPlans(
+      String trainerId) async {
+    final encoded = Uri.encodeComponent(trainerId);
+    final data = await _getJson('/trainers/$encoded/subscription-plans');
+    if (data is! Map<String, dynamic>) return const [];
+    final plans = data['plans'];
+    if (plans is! List) return const [];
+    return plans
+        .map((p) => TrainerSubscriptionPlan.fromJson(p as Map<String, dynamic>))
+        .toList(growable: false);
   }
 
   Future<List<MySubscription>> fetchMySubscriptions() async {
@@ -112,6 +188,11 @@ class PlansApiService {
       headers: _headers,
       body: jsonEncode(payload),
     );
+    return _decodeResponse(response);
+  }
+
+  Future<dynamic> _deleteJson(String path) async {
+    final response = await http.delete(_resolve(path), headers: _headers);
     return _decodeResponse(response);
   }
 
@@ -265,6 +346,11 @@ class SubscriptionRequest {
     required this.status,
     required this.requestedAt,
     this.respondedAt,
+    this.planId,
+    this.planName,
+    this.planPrice,
+    this.durationMonths,
+    this.expiresAt,
   });
 
   final String requestId;
@@ -274,6 +360,11 @@ class SubscriptionRequest {
   final String status; // PENDING | APPROVED | REJECTED
   final String requestedAt;
   final String? respondedAt;
+  final String? planId;
+  final String? planName;
+  final double? planPrice;
+  final int? durationMonths;
+  final String? expiresAt;
 
   bool get isPending => status == 'PENDING';
   bool get isApproved => status == 'APPROVED';
@@ -289,6 +380,17 @@ class SubscriptionRequest {
       requestedAt: _toHumanDate((json['requestedAt'] ?? '').toString()),
       respondedAt: json['respondedAt'] != null
           ? _toHumanDate(json['respondedAt'].toString())
+          : null,
+      planId: json['planId']?.toString(),
+      planName: json['planName']?.toString(),
+      planPrice: json['planPrice'] != null
+          ? (json['planPrice'] as num).toDouble()
+          : null,
+      durationMonths: json['durationMonths'] != null
+          ? (json['durationMonths'] as num).toInt()
+          : null,
+      expiresAt: json['expiresAt'] != null
+          ? _toHumanDate(json['expiresAt'].toString())
           : null,
     );
   }
@@ -306,11 +408,21 @@ class MySubscription {
     required this.trainerId,
     required this.status,
     required this.requestedAt,
+    this.planId,
+    this.planName,
+    this.planPrice,
+    this.durationMonths,
+    this.expiresAt,
   });
 
   final String trainerId;
   final String status; // PENDING | APPROVED | REJECTED
   final String requestedAt;
+  final String? planId;
+  final String? planName;
+  final double? planPrice;
+  final int? durationMonths;
+  final String? expiresAt;
 
   bool get isPending => status == 'PENDING';
   bool get isApproved => status == 'APPROVED';
@@ -320,6 +432,60 @@ class MySubscription {
       trainerId: (json['trainerId'] ?? '').toString(),
       status: (json['status'] ?? 'PENDING').toString(),
       requestedAt: (json['requestedAt'] ?? '').toString(),
+      planId: json['planId']?.toString(),
+      planName: json['planName']?.toString(),
+      planPrice: json['planPrice'] != null
+          ? (json['planPrice'] as num).toDouble()
+          : null,
+      durationMonths: json['durationMonths'] != null
+          ? (json['durationMonths'] as num).toInt()
+          : null,
+      expiresAt: json['expiresAt']?.toString(),
     );
+  }
+}
+
+// ── Trainer subscription plan (unified with GymSubscriptionPlan schema) ──────
+
+class TrainerSubscriptionPlan {
+  const TrainerSubscriptionPlan({
+    required this.planId,
+    required this.title,
+    required this.price,
+    required this.durationMonths,
+    this.currency = 'IQD',
+    this.description = '',
+    this.isActive = true,
+  });
+
+  final String planId;
+  final String title;
+  final double price;
+  final int durationMonths;
+  final String currency;
+  final String description;
+  final bool isActive;
+
+  /// Back-compat getter so old code using `.name` still works.
+  String get name => title;
+
+  factory TrainerSubscriptionPlan.fromJson(Map<String, dynamic> json) {
+    return TrainerSubscriptionPlan(
+      planId: (json['planId'] ?? '').toString(),
+      // Prefer "title" (unified), fall back to "name" (old data)
+      title: (json['title'] ?? json['name'] ?? '').toString(),
+      price: (json['price'] as num? ?? 0).toDouble(),
+      durationMonths: (json['durationMonths'] as num? ?? 1).toInt(),
+      currency: (json['currency'] ?? 'IQD').toString(),
+      description: (json['description'] ?? '').toString(),
+      isActive: json['isActive'] != false,
+    );
+  }
+
+  String get durationLabel {
+    if (durationMonths == 1) return 'شهر واحد';
+    if (durationMonths == 2) return 'شهران';
+    if (durationMonths <= 10) return '$durationMonths أشهر';
+    return '$durationMonths شهراً';
   }
 }

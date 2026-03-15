@@ -279,6 +279,31 @@ class _PendingCard extends StatelessWidget {
                   .bodySmall
                   ?.copyWith(color: AppTheme.textSecondary),
             ),
+            if (request.planName != null) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.card_membership,
+                      size: 14, color: AppTheme.gold),
+                  const SizedBox(width: 4),
+                  Text(
+                    request.planName!,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.gold,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  if (request.planPrice != null) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      '${request.planPrice} د.ع',
+                      style: const TextStyle(
+                          fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                  ],
+                ],
+              ),
+            ],
             const SizedBox(height: 14),
             Row(
               children: [
@@ -301,8 +326,8 @@ class _PendingCard extends StatelessWidget {
                     icon: const Icon(Icons.check, size: 18),
                     label: const Text('قبول'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppTheme.cardLime,
-                      foregroundColor: Colors.black,
+                      backgroundColor: AppTheme.gold,
+                      foregroundColor: AppTheme.textOnGold,
                     ),
                   ),
                 ),
@@ -323,55 +348,132 @@ class _ApprovedCard extends StatelessWidget {
   final SubscriptionRequest request;
   final ColorScheme scheme;
 
+  bool _isExpired(String iso) {
+    try {
+      return DateTime.parse(iso).isBefore(DateTime.now());
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: AppTheme.cardLime.withValues(alpha: 0.4)),
+        side: BorderSide(color: AppTheme.gold.withValues(alpha: 0.4)),
       ),
-      child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        leading: CircleAvatar(
-          backgroundColor: AppTheme.cardLime.withValues(alpha: 0.18),
-          child: Text(
-            request.clientName.isNotEmpty
-                ? request.clientName[0].toUpperCase()
-                : '؟',
-            style: const TextStyle(
-                color: AppTheme.cardLime, fontWeight: FontWeight.bold),
-          ),
-        ),
-        title: Text(
-          request.clientName.isNotEmpty ? request.clientName : 'متدرب',
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        subtitle: Column(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (request.gymId.isNotEmpty)
-              Text('النادي: ${request.gymId}',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppTheme.textSecondary)),
-            if (request.respondedAt != null)
-              Text('قُبل في: ${request.respondedAt}',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppTheme.textSecondary)),
+            CircleAvatar(
+              backgroundColor: AppTheme.gold.withValues(alpha: 0.18),
+              child: Text(
+                request.clientName.isNotEmpty
+                    ? request.clientName[0].toUpperCase()
+                    : '؟',
+                style: const TextStyle(
+                    color: AppTheme.gold, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    request.clientName.isNotEmpty
+                        ? request.clientName
+                        : 'متدرب',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                  if (request.gymId.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text('النادي: ${request.gymId}',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppTheme.textSecondary)),
+                  ],
+                  if (request.respondedAt != null) ...[
+                    const SizedBox(height: 2),
+                    Text('قُبل في: ${request.respondedAt}',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppTheme.textSecondary)),
+                  ],
+                  if (request.planName != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.card_membership,
+                            size: 14, color: AppTheme.gold),
+                        const SizedBox(width: 4),
+                        Text(
+                          request.planName!,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.gold,
+                              fontWeight: FontWeight.w600),
+                        ),
+                        if (request.planPrice != null) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '${request.planPrice} د.ع',
+                            style: const TextStyle(
+                                fontSize: 12, color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                  if (request.expiresAt != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          _isExpired(request.expiresAt!)
+                              ? Icons.event_busy
+                              : Icons.event_available,
+                          size: 14,
+                          color: _isExpired(request.expiresAt!)
+                              ? Colors.red.shade400
+                              : Colors.green.shade400,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _isExpired(request.expiresAt!)
+                              ? 'انتهى: ${request.expiresAt}'
+                              : 'ينتهي: ${request.expiresAt}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _isExpired(request.expiresAt!)
+                                ? Colors.red.shade400
+                                : Colors.green.shade400,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.gold.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Text('مقبول',
+                  style: TextStyle(
+                      color: AppTheme.gold,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+            ),
           ],
-        ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppTheme.cardLime.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: const Text('مقبول',
-              style: TextStyle(
-                  color: AppTheme.cardLime,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600)),
         ),
       ),
     );

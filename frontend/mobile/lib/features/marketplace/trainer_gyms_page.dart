@@ -84,7 +84,7 @@ class _TrainerGymsPageState extends State<TrainerGymsPage> {
                   style: Theme.of(context)
                       .textTheme
                       .headlineSmall
-                      ?.copyWith(color: AppTheme.cardLime)),
+                      ?.copyWith(color: AppTheme.gold)),
               const SizedBox(height: 8),
               Text(
                 'يمكنك الانضمام إلى 4 نوادٍ كحد أقصى.',
@@ -205,7 +205,7 @@ class _TrainerGymsPageState extends State<TrainerGymsPage> {
                   style: Theme.of(context)
                       .textTheme
                       .titleLarge
-                      ?.copyWith(color: AppTheme.cardLime)),
+                      ?.copyWith(color: AppTheme.gold)),
               const SizedBox(height: 8),
               if (data.gyms.isEmpty)
                 Container(
@@ -221,8 +221,9 @@ class _TrainerGymsPageState extends State<TrainerGymsPage> {
                 (gym) => Card(
                   child: ListTile(
                     leading: const CircleAvatar(
-                      backgroundColor: AppTheme.cardLime,
-                      child: Icon(Icons.fitness_center, color: Colors.black),
+                      backgroundColor: AppTheme.gold,
+                      child: Icon(Icons.fitness_center,
+                          color: AppTheme.textOnGold),
                     ),
                     title: Text(gym.gymName),
                     subtitle: Text('المدينة: ${gym.city} | عملاء نشطون: ${gym.activeClients}'),
@@ -262,7 +263,7 @@ class _TrainerGymsPageState extends State<TrainerGymsPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 80),
+              const SizedBox(height: 16),
             ],
           );
         },
@@ -444,8 +445,8 @@ class _GymSearchResultCard extends StatelessWidget {
             Row(
               children: [
                 const CircleAvatar(
-                  backgroundColor: AppTheme.cardLavender,
-                  child: Icon(Icons.fitness_center, color: Colors.black),
+                  backgroundColor: AppTheme.gold,
+                  child: Icon(Icons.fitness_center, color: AppTheme.textOnGold),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -477,7 +478,9 @@ class _GymSearchResultCard extends StatelessWidget {
                 if (isAlreadyJoined)
                   Chip(
                     label: const Text('منضم'),
-                    backgroundColor: AppTheme.cardLime.withValues(alpha: 0.3),
+                    backgroundColor: AppTheme.gold.withValues(alpha: 0.25),
+                    labelStyle: const TextStyle(
+                        color: AppTheme.gold, fontWeight: FontWeight.w600),
                   )
                 else
                   FilledButton.icon(

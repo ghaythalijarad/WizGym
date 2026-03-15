@@ -68,8 +68,8 @@ class _OwnerAnalyticsPageState extends State<OwnerAnalyticsPage> {
 
           return ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(
-                16, 16, 16, 16 + MediaQuery.paddingOf(context).bottom + 80),
+            padding: const EdgeInsets.fromLTRB(
+                16, 16, 16, 24),
             children: [
               Text('تحليلات المالك',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -208,7 +208,7 @@ class _OwnerAnalyticsPageState extends State<OwnerAnalyticsPage> {
                   );
                 },
               ),
-              const SizedBox(height: 80),
+              const SizedBox(height: 16),
             ],
           );
         },

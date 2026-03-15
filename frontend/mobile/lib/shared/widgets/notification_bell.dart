@@ -85,7 +85,7 @@ class _NotificationBellState extends State<NotificationBell>
                   ? Icons.notifications_rounded
                   : Icons.notifications_outlined,
               color: unread > 0
-                  ? AppTheme.cardLime
+                  ? AppTheme.gold
                   : Theme.of(context).colorScheme.onSurface,
             ),
           ),
@@ -194,14 +194,14 @@ class _NotificationPanelState extends State<_NotificationPanel> {
                 child: Row(
                   children: [
                     const Icon(Icons.notifications_rounded,
-                        color: AppTheme.cardLime, size: 22),
+                        color: AppTheme.gold, size: 22),
                     const SizedBox(width: 10),
                     Text(
                       'الإشعارات',
                       style: Theme.of(context)
                           .textTheme
                           .titleLarge
-                          ?.copyWith(color: AppTheme.cardLime),
+                          ?.copyWith(color: AppTheme.gold),
                     ),
                     const Spacer(),
                     if (notifications.any((n) => !n.isRead))
@@ -323,7 +323,7 @@ class _NotificationTile extends StatelessWidget {
                           height: 7,
                           margin: const EdgeInsets.only(right: 4),
                           decoration: const BoxDecoration(
-                            color: AppTheme.cardLime,
+                            color: AppTheme.gold,
                             shape: BoxShape.circle,
                           ),
                         ),

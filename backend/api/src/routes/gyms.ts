@@ -1,4 +1,9 @@
 import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import {
   DeleteCommand,
   DynamoDBDocumentClient,
   GetCommand,
@@ -7,6 +12,7 @@ import {
   ScanCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyResultV2,
@@ -15,6 +21,9 @@ import { randomBytes } from "crypto";
 import { pushNotification } from "./notifications";
 
 const TABLE = process.env.DYNAMODB_TABLE_NAME || "wizgym-prod-core";
+const GYM_PHOTOS_BUCKET = process.env.GYM_PHOTOS_BUCKET || "";
+const SUBSCRIPTION_PROOFS_BUCKET = process.env.SUBSCRIPTION_PROOFS_BUCKET || "";
+const s3 = new S3Client({});
 
 function ok(body: unknown): APIGatewayProxyResultV2 {
   return {
@@ -30,11 +39,15 @@ function created(body: unknown): APIGatewayProxyResultV2 {
     body: JSON.stringify(body),
   };
 }
-function err(status: number, msg: string): APIGatewayProxyResultV2 {
+function err(
+  status: number,
+  msg: string,
+  additionalData?: Record<string, unknown>
+): APIGatewayProxyResultV2 {
   return {
     statusCode: status,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: msg }),
+    body: JSON.stringify({ message: msg, ...additionalData }),
   };
 }
 
@@ -58,6 +71,71 @@ function userName(event: APIGatewayProxyEventV2): string {
   }
 }
 
+async function assertGymOwnerOrAdmin(
+  docClient: DynamoDBDocumentClient,
+  event: APIGatewayProxyEventV2,
+  gymId: string
+): Promise<APIGatewayProxyResultV2 | null> {
+  const role = userRole(event);
+  if (role === "ADMIN") return null;
+  if (role !== "OWNER") return err(403, "غير مصرح");
+
+  const uid = userId(event);
+  if (!uid || uid === "anon") return err(401, "غير مصرح");
+
+  const profileRes = await docClient.send(
+    new GetCommand({
+      TableName: TABLE,
+      Key: { PK: `GYM#${gymId}`, SK: "PROFILE" },
+      ProjectionExpression: "ownerId",
+    })
+  );
+
+  const ownerId = String((profileRes.Item as any)?.ownerId || "");
+  if (!ownerId) return err(404, "النادي غير موجود");
+  if (ownerId !== uid)
+    return err(403, "فقط مالك النادي يمكنه تنفيذ هذا الإجراء");
+
+  return null;
+}
+
+function guessExtFromContentType(contentType: string): string {
+  const ct = contentType.toLowerCase();
+  if (ct.includes("jpeg")) return "jpg";
+  if (ct.includes("png")) return "png";
+  if (ct.includes("webp")) return "webp";
+  if (ct.includes("heic")) return "heic";
+  return "jpg";
+}
+
+function parseS3ObjectKeyFromUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    // Support virtual-hosted style: https://bucket.s3.amazonaws.com/key
+    if (u.hostname.startsWith(`${GYM_PHOTOS_BUCKET}.s3`)) {
+      return decodeURIComponent(u.pathname.replace(/^\//, ""));
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function parseS3ObjectKeyFromUrlForBucket(
+  url: string,
+  bucket: string
+): string | null {
+  try {
+    const u = new URL(url);
+    if (bucket && u.hostname.startsWith(`${bucket}.s3`)) {
+      return decodeURIComponent(u.pathname.replace(/^\//, ""));
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function gymSummaryFromItem(i: Record<string, unknown>) {
   return {
     id: String(i["gymId"] || i["PK"] || "").replace("GYM#", ""),
@@ -71,6 +149,7 @@ function gymSummaryFromItem(i: Record<string, unknown>) {
     trainersCount: Number(i["trainersCount"] || 0),
     averageRating: Number(i["averageRating"] || 0),
     status: i["status"] || "ACTIVE",
+    openingHours: i["openingHours"] || null,
   };
 }
 
@@ -81,6 +160,34 @@ export async function handleGyms(
   const path = event.rawPath || "";
   const method = event.requestContext.http.method;
   const params = event.queryStringParameters || {};
+
+  // ─── GET /subscriptions/plans — platform subscription plans (for owners) ───
+  if (path.endsWith("/subscriptions/plans") && method === "GET") {
+    const res = await docClient.send(
+      new ScanCommand({
+        TableName: TABLE,
+        FilterExpression: "PK = :pk AND begins_with(SK, :sk)",
+        ExpressionAttributeValues: {
+          ":pk": "PLATFORM",
+          ":sk": "SUBSCRIPTION_PLAN#",
+        },
+      })
+    );
+
+    const items = (res.Items || []) as Record<string, unknown>[];
+    const plans = items
+      .map((p) => ({
+        planId: String(p["planId"] || ""),
+        durationMonths: Number(p["durationMonths"] || 1),
+        price: Number(p["price"] || 0),
+        currency: String(p["currency"] || "IQD"),
+        isActive: p["isActive"] !== false,
+      }))
+      .filter((p) => p.planId && p.isActive)
+      .sort((a, b) => a.durationMonths - b.durationMonths);
+
+    return ok({ plans });
+  }
 
   // ─── GET /gyms/public — public listing ─────────────────────────────
   if (path.endsWith("/gyms/public") && method === "GET") {
@@ -143,10 +250,88 @@ export async function handleGyms(
         new Date(s["expiresAt"] as string).getTime() > nowMs;
     }
 
-    return ok(items.map((i) => {
-      const gId = String(i["gymId"] || i["PK"] || "").replace("GYM#", "");
-      return { ...gymSummaryFromItem(i), subscriptionActive: subMap[gId] === true };
-    }));
+    // Fetch all gym photos
+    const photosRes = await docClient.send(
+      new ScanCommand({
+        TableName: TABLE,
+        FilterExpression: "begins_with(PK, :g) AND begins_with(SK, :ph)",
+        ExpressionAttributeValues: { ":g": "GYM#", ":ph": "PHOTO#" },
+      })
+    );
+
+    const photoMap: Record<
+      string,
+      { photoId: string; url: string; objectKey: string }[]
+    > = {};
+    for (const p of (photosRes.Items || []) as Record<string, unknown>[]) {
+      const gId = String(p["PK"] || "").replace("GYM#", "");
+      if (!photoMap[gId]) photoMap[gId] = [];
+      photoMap[gId].push({
+        photoId: String(p["photoId"] || ""),
+        url: String(p["url"] || ""),
+        objectKey: String(p["objectKey"] || ""),
+      });
+    }
+
+    const signPhoto = async (
+      gymId: string,
+      photo: { photoId: string; url: string; objectKey: string }
+    ) => {
+      if (!GYM_PHOTOS_BUCKET) {
+        return {
+          photoId: photo.photoId,
+          url: photo.url,
+          expiresIn: null,
+          presigned: false,
+        };
+      }
+
+      const resolvedKey = photo.objectKey || parseS3ObjectKeyFromUrl(photo.url);
+      if (!resolvedKey) {
+        return {
+          photoId: photo.photoId,
+          url: photo.url,
+          expiresIn: null,
+          presigned: false,
+        };
+      }
+
+      const signed = await getSignedUrl(
+        s3,
+        new GetObjectCommand({ Bucket: GYM_PHOTOS_BUCKET, Key: resolvedKey }),
+        { expiresIn: 60 * 10 }
+      );
+
+      return {
+        photoId: photo.photoId,
+        url: signed,
+        expiresIn: 60 * 10,
+        presigned: true,
+      };
+    };
+
+    return ok(
+      await Promise.all(
+        items.map(async (i) => {
+          const gId = String(i["gymId"] || i["PK"] || "").replace("GYM#", "");
+          const photos = photoMap[gId] || [];
+          const photoViewUrls = await Promise.all(
+            photos.map((p) => signPhoto(gId, p))
+          );
+
+          return {
+            ...gymSummaryFromItem(i),
+            subscriptionActive: subMap[gId] === true,
+            // Back-compat: keep raw urls/keys list for older clients
+            photos: photos
+              .map((p) => p.url)
+              .filter((u) => u && u.trim().length > 0),
+            // Preferred for clients: presigned (works with private S3)
+            photoViewUrls,
+          };
+        })
+      )
+    );
   }
 
   // ─── GET /gyms/owner/mine — owner's gyms ──────────────────────────
@@ -248,9 +433,10 @@ export async function handleGyms(
           coverImageUrl: body.coverImageUrl || null,
           audience: body.audience || "MIXED",
           amenities: body.amenities || [],
+          openingHours: body.openingHours || null,
           ownerId: uid,
           ownerName: userName(event),
-          status: "ACTIVE",
+          status: "PENDING_APPROVAL",
           membersCount: 0,
           trainersCount: 0,
           averageRating: 0,
@@ -308,8 +494,8 @@ export async function handleGyms(
 
     const profile = profileRes.Item as Record<string, unknown>;
 
-    // Fetch subscription plans, facilities, products in parallel
-    const [plansRes, facRes, prodRes] = await Promise.all([
+    // Fetch subscription plans, facilities, products, photos in parallel
+    const [plansRes, facRes, prodRes, gymPhotosRes] = await Promise.all([
       docClient.send(
         new QueryCommand({
           TableName: TABLE,
@@ -334,6 +520,16 @@ export async function handleGyms(
           ExpressionAttributeValues: {
             ":pk": `GYM#${gymId}`,
             ":sk": "PRODUCT#",
+          },
+        })
+      ),
+      docClient.send(
+        new QueryCommand({
+          TableName: TABLE,
+          KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+          ExpressionAttributeValues: {
+            ":pk": `GYM#${gymId}`,
+            ":sk": "PHOTO#",
           },
         })
       ),
@@ -368,6 +564,47 @@ export async function handleGyms(
       })
     );
 
+    const gymPhotosRaw = (
+      (gymPhotosRes.Items || []) as Record<string, unknown>[]
+    ).map((p) => ({
+      photoId: String(p["photoId"] || ""),
+      url: String(p["url"] || ""),
+      objectKey: String(p["objectKey"] || ""),
+      uploadedAt: String(p["uploadedAt"] || ""),
+    }));
+
+    // Generate presigned URLs for private S3 photos (same logic as listing endpoint)
+    const gymPhotos = await Promise.all(
+      gymPhotosRaw.map(async (p) => {
+        if (!GYM_PHOTOS_BUCKET)
+          return { photoId: p.photoId, url: p.url, uploadedAt: p.uploadedAt };
+        const resolvedKey = p.objectKey || parseS3ObjectKeyFromUrl(p.url);
+        if (!resolvedKey)
+          return { photoId: p.photoId, url: p.url, uploadedAt: p.uploadedAt };
+        try {
+          const signed = await getSignedUrl(
+            s3,
+            new GetObjectCommand({
+              Bucket: GYM_PHOTOS_BUCKET,
+              Key: resolvedKey,
+            }),
+            { expiresIn: 60 * 10 }
+          );
+          return { photoId: p.photoId, url: signed, uploadedAt: p.uploadedAt };
+        } catch {
+          return { photoId: p.photoId, url: p.url, uploadedAt: p.uploadedAt };
+        }
+      })
+    );
+
+    const rawOwnerName = String(profile["ownerName"] || "");
+    let decodedOwnerName = rawOwnerName;
+    try {
+      decodedOwnerName = decodeURIComponent(rawOwnerName);
+    } catch {
+      /* keep raw */
+    }
+
     return ok({
       id: gymId,
       name: profile["name"] || "",
@@ -376,8 +613,12 @@ export async function handleGyms(
       coverImageUrl: profile["coverImageUrl"] || null,
       audience: profile["audience"] || "MIXED",
       amenities: (profile["amenities"] as string[]) || [],
-      ownerName: profile["ownerName"] || "",
+      ownerName: decodedOwnerName,
       averageRating: Number(profile["averageRating"] || 0),
+      status: profile["status"] || "",
+      openingHours: profile["openingHours"] || null,
+      photos: gymPhotos,
+      photoViewUrls: gymPhotos.map((p) => ({ url: p.url })),
       facilities,
       products,
       subscriptionPlans: plans,
@@ -388,6 +629,10 @@ export async function handleGyms(
   const profilePatch = path.match(/\/gyms\/([^/]+)\/profile$/);
   if (profilePatch && method === "PATCH") {
     const gymId = profilePatch[1];
+
+    const authErr = await assertGymOwnerOrAdmin(docClient, event, gymId);
+    if (authErr) return authErr;
+
     const body = JSON.parse(event.body || "{}");
     const now = new Date().toISOString();
 
@@ -420,6 +665,11 @@ export async function handleGyms(
     if (body.coverImageUrl !== undefined) {
       updateParts.push("coverImageUrl = :img");
       exprValues[":img"] = body.coverImageUrl;
+    }
+
+    if (body.openingHours !== undefined) {
+      updateParts.push("openingHours = :oh");
+      exprValues[":oh"] = body.openingHours;
     }
 
     await docClient.send(
@@ -467,6 +717,39 @@ export async function handleGyms(
     const uid = userId(event);
     const uName = userName(event);
     const now = new Date().toISOString();
+
+    // ── Check gym is approved (ACTIVE) ──────────────────────────────
+    const gymCheck = await docClient.send(
+      new GetCommand({
+        TableName: TABLE,
+        Key: { PK: `GYM#${gymId}`, SK: "PROFILE" },
+        ProjectionExpression: "#st, ownerId",
+        ExpressionAttributeNames: { "#st": "status" },
+      })
+    );
+    const gymCheckItem = gymCheck.Item as Record<string, unknown> | undefined;
+    if (!gymCheckItem || gymCheckItem["status"] !== "ACTIVE") {
+      return err(403, "هذا النادي غير معتمد ولا يقبل مدربين جدد");
+    }
+
+    // ── Check studio platform subscription is active ─────────────────
+    const trainerSubRes = await docClient.send(
+      new GetCommand({
+        TableName: TABLE,
+        Key: { PK: `GYM#${gymId}`, SK: "SUBSCRIPTION" },
+      })
+    );
+    const trainerSub = trainerSubRes.Item as
+      | Record<string, unknown>
+      | undefined;
+    const trainerSubActive =
+      trainerSub &&
+      trainerSub["status"] === "ACTIVE" &&
+      trainerSub["expiresAt"] &&
+      new Date(trainerSub["expiresAt"] as string).getTime() > Date.now();
+    if (!trainerSubActive) {
+      return err(403, "هذا النادي غير مفعّل حالياً ولا يقبل مدربين جدد");
+    }
 
     // Store trainer in gym
     await docClient.send(
@@ -584,6 +867,22 @@ export async function handleGyms(
     const body = JSON.parse(event.body || "{}");
     const now = new Date().toISOString();
 
+    // ── Check gym is approved (ACTIVE status) ───────────────────────
+    const gymProfileCheck = await docClient.send(
+      new GetCommand({
+        TableName: TABLE,
+        Key: { PK: `GYM#${gymId}`, SK: "PROFILE" },
+        ProjectionExpression: "#st",
+        ExpressionAttributeNames: { "#st": "status" },
+      })
+    );
+    const gymStatus = (
+      gymProfileCheck.Item as Record<string, unknown> | undefined
+    )?.["status"];
+    if (gymStatus !== "ACTIVE") {
+      return err(403, "هذا النادي غير معتمد ولا يقبل أعضاء جدد");
+    }
+
     // ── Check studio platform subscription is active ─────────────────
     const studioSubRes = await docClient.send(
       new GetCommand({
@@ -609,6 +908,60 @@ export async function handleGyms(
       })
     );
     const existing = existingRes.Item as Record<string, unknown> | undefined;
+
+    // ── Guard: max 2 concurrent ACTIVE gym memberships (across gyms) ─
+    // Only applies when creating a NEW join request (i.e., not already active in this gym).
+    // We count ACTIVE memberships where subscription is still valid (if expiry exists).
+    // NOTE: Pending requests are allowed; approval will re-check.
+    if (
+      !existing ||
+      String(existing["status"] || "").toUpperCase() !== "ACTIVE"
+    ) {
+      const activeRes = await docClient.send(
+        new QueryCommand({
+          TableName: TABLE,
+          IndexName: "GSI2",
+          KeyConditionExpression: "GSI2PK = :pk AND begins_with(GSI2SK, :sk)",
+          ExpressionAttributeValues: {
+            ":pk": `USER_GYMS#${uid}`,
+            ":sk": "GYM#",
+          },
+        })
+      );
+
+      const nowDate = new Date();
+      const activeOtherGyms = (
+        (activeRes.Items || []) as Record<string, unknown>[]
+      )
+        .filter((m) => String(m["status"] || "").toUpperCase() === "ACTIVE")
+        .filter((m) => {
+          const exp = m["subscriptionExpiresAt"] as string | undefined | null;
+          // If expiry is missing, treat as active.
+          if (!exp) return true;
+          return new Date(exp) > nowDate;
+        })
+        .map((m) => String(m["gymId"] || ""))
+        // exclude current gym if present
+        .filter((gid) => gid && gid !== gymId);
+
+      if (activeOtherGyms.length >= 2) {
+        return err(
+          409,
+          "لديك اشتراك فعّال في الحد الأقصى من النوادي (2) ولا يمكن إرسال طلب جديد"
+        ) as any;
+      }
+
+      // If user has at least one active membership elsewhere, return a warning-like error.
+      // Client should show a confirm dialog and allow the user to proceed by resending
+      // with `forceJoin: true`.
+      if (activeOtherGyms.length >= 1 && body.forceJoin !== true) {
+        return err(409, "لديك اشتراك فعّال في نادي آخر. هل تريد الاستمرار؟", {
+          code: "HAS_ACTIVE_MEMBERSHIP",
+          activeGymsCount: activeOtherGyms.length,
+          limit: 2,
+        });
+      }
+    }
 
     // Look up plan details if planId provided
     let selectedPlanTitle: string | null = null;
@@ -905,6 +1258,41 @@ export async function handleGyms(
       });
     }
 
+    // If approving: enforce max 2 concurrent ACTIVE gym memberships for that member.
+    if (newStatus === "ACTIVE") {
+      const activeRes = await docClient.send(
+        new QueryCommand({
+          TableName: TABLE,
+          IndexName: "GSI2",
+          KeyConditionExpression: "GSI2PK = :pk AND begins_with(GSI2SK, :sk)",
+          ExpressionAttributeValues: {
+            ":pk": `USER_GYMS#${memberId}`,
+            ":sk": "GYM#",
+          },
+        })
+      );
+
+      const nowDate = new Date();
+      const activeCount = ((activeRes.Items || []) as Record<string, unknown>[])
+        .filter((m) => String(m["status"] || "").toUpperCase() === "ACTIVE")
+        .filter((m) => {
+          const exp = m["subscriptionExpiresAt"] as string | undefined | null;
+          if (!exp) return true;
+          return new Date(exp) > nowDate;
+        })
+        .map((m) => String(m["gymId"] || ""))
+        .filter((gid) => gid)
+        // exclude this gym (we're about to approve it)
+        .filter((gid) => gid !== gymId).length;
+
+      if (activeCount >= 2) {
+        return err(
+          409,
+          "لا يمكن قبول العضو لأنه يملك اشتراكاً فعّالاً في ناديين بالفعل (الحد الأقصى 2)"
+        );
+      }
+    }
+
     // Update member status
     await docClient.send(
       new UpdateCommand({
@@ -1174,6 +1562,369 @@ export async function handleGyms(
     );
 
     return created({ id: productId, message: "تم إضافة المنتج" });
+  }
+
+  // ─── GET /gyms/:gymId/photos — list gym photos ──────────────────────
+  const gymPhotosMatch = path.match(/\/gyms\/([^/]+)\/photos$/);
+  if (gymPhotosMatch && method === "GET") {
+    const gymId = gymPhotosMatch[1];
+    const res = await docClient.send(
+      new QueryCommand({
+        TableName: TABLE,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+        ExpressionAttributeValues: { ":pk": `GYM#${gymId}`, ":sk": "PHOTO#" },
+      })
+    );
+    const items = (res.Items || []) as Record<string, unknown>[];
+    return ok({
+      photos: items.map((p) => ({
+        photoId: p["photoId"],
+        url: p["url"],
+        uploadedAt: p["uploadedAt"],
+      })),
+    });
+  }
+
+  // ─── POST /gyms/:gymId/photos/upload-url — removed (use /photos/presign) ─
+  // NOTE: Kept intentionally disabled to avoid duplicate/conflicting presign APIs.
+
+  // ─── POST /gyms/:gymId/photos/presign — get pre-signed S3 upload URL ─
+  const gymPhotosPresignMatch = path.match(/\/gyms\/([^/]+)\/photos\/presign$/);
+  if (gymPhotosPresignMatch && method === "POST") {
+    const gymId = gymPhotosPresignMatch[1];
+
+    const authErr = await assertGymOwnerOrAdmin(docClient, event, gymId);
+    if (authErr) return authErr;
+
+    if (!GYM_PHOTOS_BUCKET) {
+      return err(500, "GYM_PHOTOS_BUCKET غير مضبوط");
+    }
+
+    // Enforce max 5 photos at presign time too (avoid wasted uploads)
+    const existingRes = await docClient.send(
+      new QueryCommand({
+        TableName: TABLE,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+        ExpressionAttributeValues: { ":pk": `GYM#${gymId}`, ":sk": "PHOTO#" },
+        Select: "COUNT",
+      })
+    );
+    if ((existingRes.Count || 0) >= 5) {
+      return err(400, "وصلت للحد الأقصى للصور (5 صور فقط)");
+    }
+
+    const body = JSON.parse(event.body || "{}");
+    const contentType = String(body.contentType || "image/jpeg");
+    if (!contentType.startsWith("image/")) {
+      return err(400, "contentType يجب أن يكون image/*");
+    }
+
+    const ext = guessExtFromContentType(contentType);
+    const objectKey = `gyms/${gymId}/photos/${randomBytes(16).toString(
+      "hex"
+    )}.${ext}`;
+
+    const cmd = new PutObjectCommand({
+      Bucket: GYM_PHOTOS_BUCKET,
+      Key: objectKey,
+      ContentType: contentType,
+    });
+
+    const uploadUrl = await getSignedUrl(s3, cmd, { expiresIn: 60 });
+    const publicUrl = `https://${GYM_PHOTOS_BUCKET}.s3.amazonaws.com/${objectKey}`;
+
+    return ok({ uploadUrl, objectKey, url: publicUrl, expiresIn: 60 });
+  }
+
+  // ─── POST /gyms/:gymId/photos — upload gym photo (max 5) ────────────
+  if (gymPhotosMatch && method === "POST") {
+    const gymId = gymPhotosMatch[1];
+
+    const authErr = await assertGymOwnerOrAdmin(docClient, event, gymId);
+    if (authErr) return authErr;
+
+    const body = JSON.parse(event.body || "{}");
+    if (!body.url) return err(400, "url مطلوب");
+
+    const objectKey =
+      typeof body.objectKey === "string" && body.objectKey.trim().length > 0
+        ? body.objectKey.trim()
+        : parseS3ObjectKeyFromUrl(String(body.url));
+
+    // Count existing photos
+    const existingRes = await docClient.send(
+      new QueryCommand({
+        TableName: TABLE,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+        ExpressionAttributeValues: { ":pk": `GYM#${gymId}`, ":sk": "PHOTO#" },
+        Select: "COUNT",
+      })
+    );
+    if ((existingRes.Count || 0) >= 5) {
+      return err(400, "وصلت للحد الأقصى للصور (5 صور فقط)");
+    }
+
+    const photoId = randomBytes(6).toString("hex");
+    const now = new Date().toISOString();
+    await docClient.send(
+      new PutCommand({
+        TableName: TABLE,
+        Item: {
+          PK: `GYM#${gymId}`,
+          SK: `PHOTO#${photoId}`,
+          photoId,
+          gymId,
+          url: body.url,
+          objectKey: objectKey || null,
+          uploadedAt: now,
+        },
+      })
+    );
+    return created({ photoId, message: "تم رفع الصورة بنجاح" });
+  }
+
+  // ─── GET /gyms/:gymId/photos/:photoId/view-url — presigned GET URL ─
+  const gymPhotoViewUrlMatch = path.match(
+    /\/gyms\/([^/]+)\/photos\/([^/]+)\/view-url$/
+  );
+  if (gymPhotoViewUrlMatch && method === "GET") {
+    const gymId = gymPhotoViewUrlMatch[1];
+    const photoId = gymPhotoViewUrlMatch[2];
+
+    // Public viewing is allowed (no auth) since these are gym gallery photos,
+    // but the bucket/object can remain private.
+    if (!GYM_PHOTOS_BUCKET) return err(500, "GYM_PHOTOS_BUCKET غير مضبوط");
+
+    const photoRes = await docClient.send(
+      new GetCommand({
+        TableName: TABLE,
+        Key: { PK: `GYM#${gymId}`, SK: `PHOTO#${photoId}` },
+        ProjectionExpression: "#u, objectKey",
+        ExpressionAttributeNames: { "#u": "url" },
+      })
+    );
+
+    if (!photoRes.Item) return err(404, "الصورة غير موجودة");
+
+    const item = photoRes.Item as Record<string, unknown>;
+    const objectKey = String(item["objectKey"] || "");
+    const storedUrl = String(item["url"] || "");
+
+    const resolvedKey = objectKey || parseS3ObjectKeyFromUrl(storedUrl);
+    if (!resolvedKey) {
+      // If it isn't in our bucket, fall back to the stored URL.
+      return ok({ url: storedUrl, expiresIn: null, presigned: false });
+    }
+
+    const viewUrl = await getSignedUrl(
+      s3,
+      new GetObjectCommand({
+        Bucket: GYM_PHOTOS_BUCKET,
+        Key: resolvedKey,
+      }),
+      { expiresIn: 60 * 10 }
+    );
+
+    return ok({ url: viewUrl, expiresIn: 60 * 10, presigned: true });
+  }
+
+  // ─── DELETE /gyms/:gymId/photos/:photoId — delete gym photo ─────────
+  const gymPhotoDeleteMatch = path.match(/\/gyms\/([^/]+)\/photos\/([^/]+)$/);
+  if (gymPhotoDeleteMatch && method === "DELETE") {
+    const gymId = gymPhotoDeleteMatch[1];
+    const photoId = gymPhotoDeleteMatch[2];
+
+    const authErr = await assertGymOwnerOrAdmin(docClient, event, gymId);
+    if (authErr) return authErr;
+
+    await docClient.send(
+      new DeleteCommand({
+        TableName: TABLE,
+        Key: { PK: `GYM#${gymId}`, SK: `PHOTO#${photoId}` },
+      })
+    );
+    return ok({ message: "تم حذف الصورة" });
+  }
+
+  // ─── POST /gyms/:gymId/subscription-requests/presign — presign PUT for payment proof ─
+  const subReqPresignMatch = path.match(
+    /\/gyms\/([^/]+)\/subscription-requests\/presign$/
+  );
+  if (subReqPresignMatch && method === "POST") {
+    const gymId = subReqPresignMatch[1];
+
+    const authErr = await assertGymOwnerOrAdmin(docClient, event, gymId);
+    if (authErr) return authErr;
+
+    if (!SUBSCRIPTION_PROOFS_BUCKET) {
+      return err(500, "SUBSCRIPTION_PROOFS_BUCKET غير مضبوط");
+    }
+
+    const body = JSON.parse(event.body || "{}");
+    const contentType = String(body.contentType || "image/jpeg");
+    if (!contentType.startsWith("image/")) {
+      return err(400, "contentType يجب أن يكون image/*");
+    }
+
+    const ext = guessExtFromContentType(contentType);
+    const objectKey = `payments/subscription-proofs/gyms/${gymId}/${randomBytes(
+      16
+    ).toString("hex")}.${ext}`;
+
+    const cmd = new PutObjectCommand({
+      Bucket: SUBSCRIPTION_PROOFS_BUCKET,
+      Key: objectKey,
+      ContentType: contentType,
+    });
+
+    const uploadUrl = await getSignedUrl(s3, cmd, { expiresIn: 60 });
+    const url = `https://${SUBSCRIPTION_PROOFS_BUCKET}.s3.amazonaws.com/${objectKey}`;
+
+    return ok({ uploadUrl, objectKey, url, expiresIn: 60 });
+  }
+
+  // ─── POST /gyms/:gymId/subscription-requests — owner submits activation request ─
+  const subReqCreateMatch = path.match(
+    /\/gyms\/([^/]+)\/subscription-requests$/
+  );
+  if (subReqCreateMatch && method === "POST") {
+    const gymId = subReqCreateMatch[1];
+
+    const authErr = await assertGymOwnerOrAdmin(docClient, event, gymId);
+    if (authErr) return authErr;
+
+    const body = JSON.parse(event.body || "{}");
+    const planId = String(body.planId || "").trim();
+    const screenshotUrl = String(body.screenshotUrl || "").trim();
+    if (!planId) return err(400, "planId مطلوب");
+    if (!screenshotUrl) return err(400, "screenshotUrl مطلوب");
+
+    // Plan must exist and be active
+    const planRes = await docClient.send(
+      new GetCommand({
+        TableName: TABLE,
+        Key: { PK: "PLATFORM", SK: `SUBSCRIPTION_PLAN#${planId}` },
+      })
+    );
+    if (!planRes.Item) return err(400, "الخطة غير موجودة");
+    const plan = planRes.Item as Record<string, unknown>;
+    if (plan["isActive"] === false) return err(400, "الخطة غير متاحة حالياً");
+
+    const durationMonths = Number(plan["durationMonths"] || 1);
+    const price = Number(plan["price"] || 0);
+    const currency = String(plan["currency"] || "IQD");
+
+    const screenshotObjectKey =
+      typeof body.screenshotObjectKey === "string" &&
+      body.screenshotObjectKey.trim().length > 0
+        ? body.screenshotObjectKey.trim()
+        : parseS3ObjectKeyFromUrlForBucket(
+            screenshotUrl,
+            SUBSCRIPTION_PROOFS_BUCKET
+          );
+
+    // Prevent duplicate PENDING request
+    const pendingRes = await docClient.send(
+      new QueryCommand({
+        TableName: TABLE,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+        ExpressionAttributeValues: {
+          ":pk": `GYM#${gymId}`,
+          ":sk": "SUBSCRIPTION_REQUEST#",
+        },
+      })
+    );
+    const existingPending = (
+      (pendingRes.Items || []) as Record<string, unknown>[]
+    ).some((i) => String(i["status"] || "").toUpperCase() === "PENDING");
+    if (existingPending) {
+      return err(409, "لديك طلب اشتراك معلّق بالفعل");
+    }
+
+    const requestId = randomBytes(8).toString("hex");
+    const now = new Date().toISOString();
+
+    await docClient.send(
+      new PutCommand({
+        TableName: TABLE,
+        Item: {
+          PK: `GYM#${gymId}`,
+          SK: `SUBSCRIPTION_REQUEST#${requestId}`,
+          requestId,
+          gymId,
+          ownerId: userId(event),
+          ownerName: userName(event),
+          status: "PENDING",
+          planId,
+          durationMonths,
+          price,
+          currency,
+          paymentMethod: "ZAIN_CASH",
+          transferToPhone: "07831367435",
+          screenshotUrl,
+          screenshotObjectKey: screenshotObjectKey || null,
+          createdAt: now,
+          // GSI1 for admin listing
+          GSI1PK: "SUBSCRIPTION_REQUESTS",
+          GSI1SK: `PENDING#${now}#${gymId}#${requestId}`,
+        },
+      })
+    );
+
+    // Notify admins (best-effort). Using ownerId 'platform-admin-1' already used elsewhere.
+    await pushNotification(docClient, {
+      targetUserId: "platform-admin-1",
+      eventType: "GYM_SUBSCRIPTION_REQUEST",
+      title: "طلب تفعيل اشتراك استوديو",
+      message: `${userName(event) || "مالك"} أرسل طلب تفعيل اشتراك`,
+      payload: { gymId, requestId, planId },
+    }).catch(() => {
+      /* silent */
+    });
+
+    return created({ requestId, status: "PENDING" });
+  }
+
+  // ─── GET /gyms/:gymId/subscription-requests/mine — owner sees their requests ─
+  const subReqMineMatch = path.match(
+    /\/gyms\/([^/]+)\/subscription-requests\/mine$/
+  );
+  if (subReqMineMatch && method === "GET") {
+    const gymId = subReqMineMatch[1];
+
+    const authErr = await assertGymOwnerOrAdmin(docClient, event, gymId);
+    if (authErr) return authErr;
+
+    const res = await docClient.send(
+      new QueryCommand({
+        TableName: TABLE,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+        ExpressionAttributeValues: {
+          ":pk": `GYM#${gymId}`,
+          ":sk": "SUBSCRIPTION_REQUEST#",
+        },
+      })
+    );
+
+    const items = (res.Items || []) as Record<string, unknown>[];
+    const requests = items
+      .map((r) => ({
+        requestId: r["requestId"] || "",
+        status: r["status"] || "PENDING",
+        planId: r["planId"] || "",
+        durationMonths: Number(r["durationMonths"] || 1),
+        price: Number(r["price"] || 0),
+        currency: r["currency"] || "IQD",
+        paymentMethod: r["paymentMethod"] || "ZAIN_CASH",
+        transferToPhone: r["transferToPhone"] || "07831367435",
+        screenshotUrl: r["screenshotUrl"] || "",
+        createdAt: r["createdAt"] || "",
+        reviewedAt: r["reviewedAt"] || null,
+        note: r["note"] || null,
+      }))
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+
+    return ok({ requests });
   }
 
   // ─── GET /gyms/:gymId/my-membership — current user's membership ────

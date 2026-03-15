@@ -11,6 +11,8 @@ class GymSummary {
     required this.trainersCount,
     required this.averageRating,
     this.status = 'ACTIVE',
+    this.photos = const [],
+    this.photoViewUrls = const [],
   });
 
   final String id;
@@ -24,8 +26,20 @@ class GymSummary {
   final int trainersCount;
   final double averageRating;
   final String status;
+  final List<String> photos;
+  final List<String> photoViewUrls;
 
   factory GymSummary.fromJson(Map<String, dynamic> json) {
+    final viewRaw = json['photoViewUrls'];
+    final viewUrls = viewRaw is List
+        ? viewRaw
+            .map((e) => e is Map ? e['url'] : null)
+            .whereType<Object>()
+            .map((e) => e.toString())
+            .where((u) => u.trim().isNotEmpty)
+            .toList(growable: false)
+        : const <String>[];
+
     return GymSummary(
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
@@ -38,6 +52,8 @@ class GymSummary {
       trainersCount: _toInt(json['trainersCount']),
       averageRating: _toDouble(json['averageRating']),
       status: (json['status'] ?? 'ACTIVE').toString(),
+      photos: _toStringList(json['photos']),
+      photoViewUrls: viewUrls,
     );
   }
 }
@@ -56,6 +72,7 @@ class GymDetail {
     required this.facilities,
     required this.products,
     this.subscriptionPlans = const [],
+    this.photoViewUrls = const [],
   });
 
   final String id;
@@ -70,11 +87,21 @@ class GymDetail {
   final List<GymFacilityItem> facilities;
   final List<GymProductItem> products;
   final List<GymSubscriptionPlan> subscriptionPlans;
+  final List<String> photoViewUrls;
 
   factory GymDetail.fromJson(Map<String, dynamic> json) {
     final facilitiesRaw = json['facilities'];
     final productsRaw = json['products'];
     final plansRaw = json['subscriptionPlans'];
+    final viewRaw = json['photoViewUrls'];
+    final viewUrls = viewRaw is List
+        ? viewRaw
+            .map((e) => e is Map ? e['url'] : null)
+            .whereType<Object>()
+            .map((e) => e.toString())
+            .where((u) => u.trim().isNotEmpty)
+            .toList(growable: false)
+        : const <String>[];
 
     return GymDetail(
       id: (json['id'] ?? '').toString(),
@@ -86,6 +113,7 @@ class GymDetail {
       amenities: _toStringList(json['amenities']),
       ownerName: (json['ownerName'] ?? '').toString(),
       averageRating: _toDouble(json['averageRating']),
+      photoViewUrls: viewUrls,
       facilities: facilitiesRaw is List
           ? facilitiesRaw
               .map((item) => GymFacilityItem.fromJson(item as Map<String, dynamic>))
@@ -199,6 +227,53 @@ class TrainerGymItem {
       city: (json['city'] ?? '').toString(),
       activeClients: _toInt(json['activeClients']),
       averageRating: _toDouble(json['averageRating']),
+    );
+  }
+}
+
+class TrainerCertificateImage {
+  TrainerCertificateImage({
+    required this.url,
+    required this.presigned,
+    required this.expiresIn,
+  });
+
+  final String url;
+  final bool presigned;
+  final int? expiresIn;
+
+  factory TrainerCertificateImage.fromJson(Map<String, dynamic> json) {
+    return TrainerCertificateImage(
+      url: (json['url'] ?? '').toString(),
+      presigned: json['presigned'] == true,
+      expiresIn: json['expiresIn'] == null ? null : _toInt(json['expiresIn']),
+    );
+  }
+}
+
+class TrainerCertificateItem {
+  TrainerCertificateItem({
+    required this.id,
+    required this.name,
+    required this.year,
+    required this.description,
+    required this.image,
+  });
+
+  final String id;
+  final String name;
+  final int? year;
+  final String description;
+  final TrainerCertificateImage image;
+
+  factory TrainerCertificateItem.fromJson(Map<String, dynamic> json) {
+    return TrainerCertificateItem(
+      id: (json['id'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      year: json['year'] == null ? null : _toInt(json['year']),
+      description: (json['description'] ?? '').toString(),
+      image: TrainerCertificateImage.fromJson(
+          (json['image'] as Map?)?.cast<String, dynamic>() ?? const {}),
     );
   }
 }
@@ -475,4 +550,29 @@ List<String> _toStringList(dynamic value) {
   }
 
   return value.map((item) => item.toString()).toList(growable: false);
+}
+
+// ── Trainer public profile ────────────────────────────────────────────────────
+
+class TrainerPublicProfile {
+  const TrainerPublicProfile({
+    required this.trainerId,
+    required this.displayName,
+    this.bio,
+    this.avatarUrl,
+  });
+
+  final String trainerId;
+  final String displayName;
+  final String? bio;
+  final String? avatarUrl;
+
+  factory TrainerPublicProfile.fromJson(Map<String, dynamic> json) {
+    return TrainerPublicProfile(
+      trainerId: (json['trainerId'] ?? '').toString(),
+      displayName: (json['displayName'] ?? '').toString(),
+      bio: json['bio']?.toString(),
+      avatarUrl: json['avatarUrl']?.toString(),
+    );
+  }
 }

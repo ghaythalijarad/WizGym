@@ -102,6 +102,16 @@ class MarketplaceApiService {
         .toList(growable: false);
   }
 
+  Future<TrainerPublicProfile> fetchTrainerPublicProfile(
+      String trainerId) async {
+    final encoded = Uri.encodeComponent(trainerId);
+    final data = await _getJson('/trainers/$encoded/public');
+    if (data is! Map<String, dynamic>) {
+      throw const FormatException('Invalid trainer profile response');
+    }
+    return TrainerPublicProfile.fromJson(data);
+  }
+
   Future<List<TrainerGymItem>> fetchTrainerGyms() async {
     final data = await _getJson('/trainers/me/gyms');
 
@@ -131,9 +141,14 @@ class MarketplaceApiService {
         .toList(growable: false);
   }
 
-  Future<Map<String, dynamic>> joinGymAsUser(String gymId, {String? planId}) {
+  Future<Map<String, dynamic>> joinGymAsUser(
+    String gymId, {
+    String? planId,
+    bool? forceJoin,
+  }) {
     return _postJson('/gyms/$gymId/join', <String, dynamic>{
       if (planId != null) 'planId': planId,
+      if (forceJoin == true) 'forceJoin': true,
     });
   }
 
@@ -284,7 +299,7 @@ class MarketplaceApiService {
 
   Future<Map<String, dynamic>> rateGym({
     required String gymId,
-    required int rating,
+    required double rating,
     String? comment,
   }) {
     return _postJson('/gyms/$gymId/ratings', {
@@ -296,7 +311,7 @@ class MarketplaceApiService {
   Future<Map<String, dynamic>> rateTrainer({
     required String trainerId,
     required String gymId,
-    required int rating,
+    required double rating,
     String? comment,
   }) {
     return _postJson('/trainers/$trainerId/ratings', {
@@ -342,6 +357,181 @@ class MarketplaceApiService {
       'amenities': amenities,
       if (description != null) 'description': description.trim(),
     });
+  }
+
+  // Returns a short-lived URL for viewing a photo when the bucket is private.
+  Future<String> fetchGymPhotoViewUrl(
+    String gymId, {
+    required String photoId,
+  }) async {
+    final data = await _getJson('/gyms/$gymId/photos/$photoId/view-url');
+    if (data is! Map) {
+      throw const FormatException('Invalid gym photo view-url response');
+    }
+    final url = data['url'];
+    if (url is! String || url.isEmpty) {
+      throw const FormatException('Invalid gym photo view-url payload');
+    }
+    return url;
+  }
+
+  Future<List<GymPhotoItem>> fetchGymPhotos(String gymId) async {
+    final data = await _getJson('/gyms/$gymId/photos');
+    final map = data is Map ? data : null;
+    if (map == null) {
+      throw const FormatException('Invalid gym photos response');
+    }
+    final photos = map['photos'];
+    if (photos is! List) return const <GymPhotoItem>[];
+    return photos
+        .whereType<Map>()
+        .map((p) => GymPhotoItem.fromJson(p.cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  Future<PresignUploadResponse> presignGymPhotoUpload(
+    String gymId, {
+    required String contentType,
+  }) async {
+    final data = await _postJson('/gyms/$gymId/photos/presign', {
+      'contentType': contentType,
+    });
+
+    // `_postJson` always returns a Map<String, dynamic>.
+    return PresignUploadResponse.fromJson(data);
+  }
+
+  Future<Map<String, dynamic>> createGymPhoto(String gymId,
+      {required String url}) {
+    return _postJson('/gyms/$gymId/photos', {'url': url});
+  }
+
+  Future<Map<String, dynamic>> deleteGymPhoto(
+    String gymId, {
+    required String photoId,
+  }) {
+    return _deleteJson('/gyms/$gymId/photos/$photoId');
+  }
+
+  // ── Platform subscription activation (owner) ─────────────────────────
+
+  Future<List<PlatformSubscriptionPlan>>
+      fetchPlatformSubscriptionPlans() async {
+    final data = await _getJson('/subscriptions/plans');
+    if (data is! Map) {
+      throw const FormatException('Invalid subscription plans response');
+    }
+    final plans = data['plans'];
+    if (plans is! List) return const <PlatformSubscriptionPlan>[];
+    return plans
+        .whereType<Map>()
+        .map(
+            (p) => PlatformSubscriptionPlan.fromJson(p.cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  Future<PresignUploadResponse> presignSubscriptionProofUpload(
+    String gymId, {
+    required String contentType,
+  }) async {
+    final data = await _postJson('/gyms/$gymId/subscription-requests/presign', {
+      'contentType': contentType,
+    });
+    return PresignUploadResponse.fromJson(data);
+  }
+
+  Future<CreateSubscriptionRequestResponse> createGymSubscriptionRequest(
+    String gymId, {
+    required String planId,
+    required String screenshotUrl,
+    String? screenshotObjectKey,
+  }) async {
+    final data = await _postJson('/gyms/$gymId/subscription-requests', {
+      'planId': planId,
+      'screenshotUrl': screenshotUrl,
+      if (screenshotObjectKey != null && screenshotObjectKey.trim().isNotEmpty)
+        'screenshotObjectKey': screenshotObjectKey.trim(),
+    });
+    return CreateSubscriptionRequestResponse.fromJson(data);
+  }
+
+  Future<List<GymSubscriptionRequestItem>> fetchMyGymSubscriptionRequests(
+    String gymId,
+  ) async {
+    final data = await _getJson('/gyms/$gymId/subscription-requests/mine');
+    if (data is! Map) {
+      throw const FormatException('Invalid subscription requests response');
+    }
+    final list = data['requests'];
+    if (list is! List) return const <GymSubscriptionRequestItem>[];
+    return list
+        .whereType<Map>()
+        .map((r) =>
+            GymSubscriptionRequestItem.fromJson(r.cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  Future<PresignUploadResponse> presignTrainerCertificateUpload({
+    required String contentType,
+  }) async {
+    final data = await _postJson('/trainers/me/certificates/presign', {
+      'contentType': contentType,
+    });
+    return PresignUploadResponse.fromJson(data);
+  }
+
+  Future<List<TrainerCertificateItem>> fetchTrainerCertificates(
+    String trainerId,
+  ) async {
+    final encoded = Uri.encodeComponent(trainerId);
+    final data = await _getJson('/trainers/$encoded/certificates');
+    if (data is! Map) {
+      throw const FormatException('Invalid trainer certificates response');
+    }
+    final list = data['certificates'];
+    if (list is! List) return const <TrainerCertificateItem>[];
+    return list
+        .whereType<Map>()
+        .map((e) => TrainerCertificateItem.fromJson(e.cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  Future<List<Map<String, dynamic>>> fetchMyTrainerCertificatesRaw() async {
+    final data = await _getJson('/trainers/me/certificates');
+    if (data is! Map) {
+      throw const FormatException('Invalid my trainer certificates response');
+    }
+    final list = data['certificates'];
+    if (list is! List) return const <Map<String, dynamic>>[];
+    return list
+        .whereType<Map>()
+        .map((e) => e.cast<String, dynamic>())
+        .toList(growable: false);
+  }
+
+  Future<Map<String, dynamic>> createTrainerCertificate({
+    required String name,
+    required int year,
+    required String imageUrl,
+    String? objectKey,
+    String? description,
+  }) {
+    return _postJson('/trainers/me/certificates', {
+      'name': name.trim(),
+      'year': year,
+      'imageUrl': imageUrl.trim(),
+      if (objectKey != null && objectKey.trim().isNotEmpty)
+        'objectKey': objectKey.trim(),
+      if (description != null && description.trim().isNotEmpty)
+        'description': description.trim(),
+    });
+  }
+
+  Future<Map<String, dynamic>> deleteTrainerCertificate({
+    required String certificateId,
+  }) {
+    return _deleteJson(
+        '/trainers/me/certificates/${Uri.encodeComponent(certificateId)}');
   }
 
   Future<dynamic> _getJson(String path) async {
@@ -496,5 +686,149 @@ class MarketplaceApiService {
     // Ensure trailing slash so Uri.resolve() keeps the full path prefix.
     if (!url.endsWith('/')) url = '$url/';
     return url;
+  }
+}
+
+class GymPhotoItem {
+  const GymPhotoItem(
+      {required this.photoId, required this.url, this.uploadedAt});
+
+  final String photoId;
+  final String url;
+  final String? uploadedAt;
+
+  factory GymPhotoItem.fromJson(Map<String, dynamic> json) {
+    return GymPhotoItem(
+      photoId: (json['photoId'] ?? '').toString(),
+      url: (json['url'] ?? '').toString(),
+      uploadedAt: json['uploadedAt']?.toString(),
+    );
+  }
+}
+
+class PresignUploadResponse {
+  const PresignUploadResponse({
+    required this.uploadUrl,
+    required this.url,
+    required this.objectKey,
+    this.expiresIn,
+  });
+
+  final String uploadUrl;
+  final String url;
+  final String objectKey;
+  final int? expiresIn;
+
+  factory PresignUploadResponse.fromJson(Map<String, dynamic> json) {
+    return PresignUploadResponse(
+      uploadUrl: (json['uploadUrl'] ?? '').toString(),
+      url: (json['url'] ?? '').toString(),
+      objectKey: (json['objectKey'] ?? '').toString(),
+      expiresIn:
+          json['expiresIn'] is num ? (json['expiresIn'] as num).toInt() : null,
+    );
+  }
+}
+
+class PlatformSubscriptionPlan {
+  const PlatformSubscriptionPlan({
+    required this.planId,
+    required this.durationMonths,
+    required this.price,
+    required this.currency,
+  });
+
+  final String planId;
+  final int durationMonths;
+  final int price;
+  final String currency;
+
+  factory PlatformSubscriptionPlan.fromJson(Map<String, dynamic> json) {
+    return PlatformSubscriptionPlan(
+      planId: (json['planId'] ?? '').toString(),
+      durationMonths: (json['durationMonths'] is num)
+          ? (json['durationMonths'] as num).toInt()
+          : int.tryParse((json['durationMonths'] ?? '1').toString()) ?? 1,
+      price: (json['price'] is num)
+          ? (json['price'] as num).toInt()
+          : int.tryParse((json['price'] ?? '0').toString()) ?? 0,
+      currency: (json['currency'] ?? 'IQD').toString(),
+    );
+  }
+
+  String get labelAr => durationMonths == 12
+      ? 'سنة'
+      : durationMonths == 9
+          ? '٩ أشهر'
+          : durationMonths == 6
+              ? '٦ أشهر'
+              : durationMonths == 3
+                  ? '٣ أشهر'
+                  : durationMonths == 2
+                      ? 'شهران'
+                      : 'شهر';
+}
+
+class CreateSubscriptionRequestResponse {
+  const CreateSubscriptionRequestResponse(
+      {required this.requestId, required this.status});
+
+  final String requestId;
+  final String status;
+
+  factory CreateSubscriptionRequestResponse.fromJson(
+      Map<String, dynamic> json) {
+    return CreateSubscriptionRequestResponse(
+      requestId: (json['requestId'] ?? '').toString(),
+      status: (json['status'] ?? '').toString(),
+    );
+  }
+}
+
+class GymSubscriptionRequestItem {
+  const GymSubscriptionRequestItem({
+    required this.requestId,
+    required this.status,
+    required this.planId,
+    required this.durationMonths,
+    required this.price,
+    required this.currency,
+    required this.transferToPhone,
+    required this.screenshotUrl,
+    required this.createdAt,
+    this.reviewedAt,
+    this.note,
+  });
+
+  final String requestId;
+  final String status;
+  final String planId;
+  final int durationMonths;
+  final int price;
+  final String currency;
+  final String transferToPhone;
+  final String screenshotUrl;
+  final String createdAt;
+  final String? reviewedAt;
+  final String? note;
+
+  factory GymSubscriptionRequestItem.fromJson(Map<String, dynamic> json) {
+    return GymSubscriptionRequestItem(
+      requestId: (json['requestId'] ?? '').toString(),
+      status: (json['status'] ?? 'PENDING').toString(),
+      planId: (json['planId'] ?? '').toString(),
+      durationMonths: (json['durationMonths'] is num)
+          ? (json['durationMonths'] as num).toInt()
+          : int.tryParse((json['durationMonths'] ?? '1').toString()) ?? 1,
+      price: (json['price'] is num)
+          ? (json['price'] as num).toInt()
+          : int.tryParse((json['price'] ?? '0').toString()) ?? 0,
+      currency: (json['currency'] ?? 'IQD').toString(),
+      transferToPhone: (json['transferToPhone'] ?? '07831367435').toString(),
+      screenshotUrl: (json['screenshotUrl'] ?? '').toString(),
+      createdAt: (json['createdAt'] ?? '').toString(),
+      reviewedAt: json['reviewedAt']?.toString(),
+      note: json['note']?.toString(),
+    );
   }
 }

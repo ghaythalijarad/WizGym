@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_session.dart';
@@ -32,35 +30,25 @@ class RoleShell extends StatefulWidget {
 class _RoleShellState extends State<RoleShell> {
   int _index = 0;
 
+  void _goToTab(int index) => setState(() => _index = index);
+
   @override
   Widget build(BuildContext context) {
     final config = _tabsForRole(widget.role, widget.session);
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text('GymOS - ${widget.role.labelAr}')),
-      extendBody: true,
-      body: AppBackground(child: config.pages[_index]),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: scheme.surface.withValues(alpha: 0.86),
-                border: Border.all(color: scheme.outlineVariant),
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: NavigationBar(
-                selectedIndex: _index,
-                onDestinationSelected: (value) => setState(() => _index = value),
-                destinations: config.destinations,
-              ),
-            ),
-          ),
-        ),
+      appBar: null,
+      // extendBody removed — nav bar is fixed, content never goes behind it
+      body: SafeArea(
+        bottom: true,
+        child: AppBackground(child: config.pages[_index]),
+      ),
+      bottomNavigationBar: NavigationBar(
+        backgroundColor: scheme.surface,
+        selectedIndex: _index,
+        onDestinationSelected: (value) => setState(() => _index = value),
+        destinations: config.destinations,
       ),
     );
   }
@@ -71,10 +59,10 @@ class _RoleShellState extends State<RoleShell> {
         // Admin uses the web dashboard — fallback to user view in mobile
         return _RoleTabsConfig(
           pages: [
-            const UserHomePage(),
-            UserMarketplacePage(session: session),
-            UserPlansPage(session: session),
-            RoleProfilePage(role: role, session: session),
+            const Material(child: UserHomePage()),
+            Material(child: UserMarketplacePage(session: session)),
+            Material(child: UserPlansPage(session: session)),
+            Material(child: RoleProfilePage(role: role, session: session)),
           ],
           destinations: const [
             NavigationDestination(icon: Icon(Icons.home_outlined), label: 'الرئيسية'),
@@ -86,11 +74,11 @@ class _RoleShellState extends State<RoleShell> {
       case AppRole.owner:
         return _RoleTabsConfig(
           pages: [
-            OwnerHomePage(session: session),
-            OwnerStudioPage(session: session),
-            OwnerMembersPage(session: session),
-            OwnerPlansPage(session: session),
-            RoleProfilePage(role: role, session: session),
+            Material(child: OwnerHomePage(session: session)),
+            Material(child: OwnerStudioPage(session: session)),
+            Material(child: OwnerMembersPage(session: session)),
+            Material(child: OwnerPlansPage(session: session)),
+            Material(child: RoleProfilePage(role: role, session: session)),
           ],
           destinations: const [
             NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'الرئيسية'),
@@ -126,10 +114,10 @@ class _RoleShellState extends State<RoleShell> {
       case AppRole.user:
         return _RoleTabsConfig(
           pages: [
-            const UserHomePage(),
-            UserMarketplacePage(session: session),
-            UserPlansPage(session: session),
-            RoleProfilePage(role: role, session: session),
+            Material(child: UserHomePage(onGoToTab: _goToTab)),
+            Material(child: UserMarketplacePage(session: session)),
+            Material(child: UserPlansPage(session: session)),
+            Material(child: RoleProfilePage(role: role, session: session)),
           ],
           destinations: const [
             NavigationDestination(
@@ -144,10 +132,10 @@ class _RoleShellState extends State<RoleShell> {
       case AppRole.trainee:
         return _RoleTabsConfig(
           pages: [
-            const UserHomePage(),
-            UserMarketplacePage(session: session),
-            UserPlansPage(session: session),
-            RoleProfilePage(role: role, session: session),
+            Material(child: UserHomePage(onGoToTab: _goToTab)),
+            Material(child: UserMarketplacePage(session: session)),
+            Material(child: UserPlansPage(session: session)),
+            Material(child: RoleProfilePage(role: role, session: session)),
           ],
           destinations: const [
             NavigationDestination(icon: Icon(Icons.home_outlined), label: 'الرئيسية'),

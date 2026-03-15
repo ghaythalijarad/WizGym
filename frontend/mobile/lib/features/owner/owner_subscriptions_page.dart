@@ -64,8 +64,8 @@ class _OwnerSubscriptionsPageState extends State<OwnerSubscriptionsPage> {
 
           return ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(
-                16, 16, 16, 16 + MediaQuery.paddingOf(context).bottom + 80),
+            padding: const EdgeInsets.fromLTRB(
+                16, 16, 16, 24),
             children: [
               Text('إدارة الاشتراكات',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -247,7 +247,7 @@ class _OwnerSubscriptionsPageState extends State<OwnerSubscriptionsPage> {
                 },
               ),
               // extra spacing so content is not hidden behind bottom nav
-              const SizedBox(height: 80),
+              const SizedBox(height: 16),
             ],
           );
         },
