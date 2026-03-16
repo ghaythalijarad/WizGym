@@ -154,6 +154,17 @@ class _UserMarketplaceDetailPageState extends State<UserMarketplaceDetailPage> {
                   ),
                 ],
 
+                // ── Opening hours ────────────────────────────────────────
+                if (data.detail.openingHours != null &&
+                    data.detail.openingHours!.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  const _DetailSectionHeader(
+                      label: 'أوقات الدوام',
+                      icon: Icons.schedule_rounded),
+                  const SizedBox(height: 10),
+                  _OpeningHoursCard(hours: data.detail.openingHours!),
+                ],
+
                 const SizedBox(height: 18),
 
                 // ── Membership / join action ─────────────────────────────
@@ -2075,6 +2086,95 @@ class _TrainerPlanPickerSheet extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Opening hours display card ──────────────────────────────────────────────
+class _OpeningHoursCard extends StatelessWidget {
+  const _OpeningHoursCard({required this.hours});
+
+  final Map<String, DayHours> hours;
+
+  @override
+  Widget build(BuildContext context) {
+    // Determine today's day key
+    final now = DateTime.now();
+    const dartWeekdayToKey = {
+      DateTime.saturday: 'saturday',
+      DateTime.sunday: 'sunday',
+      DateTime.monday: 'monday',
+      DateTime.tuesday: 'tuesday',
+      DateTime.wednesday: 'wednesday',
+      DateTime.thursday: 'thursday',
+      DateTime.friday: 'friday',
+    };
+    final todayKey = dartWeekdayToKey[now.weekday] ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF16162A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.gold.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        children: kWeekDayKeys.map((day) {
+          final label = kWeekDayLabelsAr[day] ?? day;
+          final dh = hours[day];
+          final isToday = day == todayKey;
+          final isClosed = dh == null || dh.isEmpty;
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Row(
+              children: [
+                if (isToday)
+                  Container(
+                    width: 6,
+                    height: 6,
+                    margin: const EdgeInsets.only(left: 6),
+                    decoration: const BoxDecoration(
+                      color: AppTheme.gold,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                SizedBox(
+                  width: 70,
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: isToday
+                          ? AppTheme.gold
+                          : AppTheme.textPrimary,
+                      fontSize: 13,
+                      fontWeight:
+                          isToday ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isClosed ? 'مغلق' : '${dh.open} – ${dh.close}',
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      color: isClosed
+                          ? AppTheme.textMuted.withValues(alpha: 0.5)
+                          : isToday
+                              ? AppTheme.gold
+                              : AppTheme.textSecondary,
+                      fontSize: 13,
+                      fontWeight:
+                          isToday ? FontWeight.w700 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(growable: false),
       ),
     );
   }

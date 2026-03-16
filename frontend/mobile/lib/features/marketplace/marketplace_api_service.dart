@@ -198,6 +198,7 @@ class MarketplaceApiService {
     String audience = 'MIXED',
     List<String> amenities = const [],
     List<Map<String, dynamic>> subscriptionPlans = const [],
+    Map<String, dynamic>? openingHours,
   }) {
     return _postJson('/gyms', {
       'name': name.trim(),
@@ -209,6 +210,7 @@ class MarketplaceApiService {
       'audience': audience,
       'amenities': amenities,
       'subscriptionPlans': subscriptionPlans,
+      if (openingHours != null) 'openingHours': openingHours,
     });
   }
 
@@ -351,11 +353,13 @@ class MarketplaceApiService {
     required String audience,
     required List<String> amenities,
     String? description,
+    Map<String, dynamic>? openingHours,
   }) {
     return _patchJson('/gyms/$gymId/profile', {
       'audience': audience,
       'amenities': amenities,
       if (description != null) 'description': description.trim(),
+      if (openingHours != null) 'openingHours': openingHours,
     });
   }
 

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_session.dart';
 import '../../core/models/app_role.dart';
+import '../../core/theme/app_theme.dart';
 import '../marketplace/marketplace_api_service.dart';
+import '../marketplace/marketplace_models.dart';
 
 class OwnerCreateGymPage extends StatefulWidget {
   const OwnerCreateGymPage({super.key, this.session});
@@ -33,6 +35,7 @@ class _OwnerCreateGymPageState extends State<OwnerCreateGymPage> {
   final _descriptionController = TextEditingController();
   String _audience = 'MIXED';
   final Set<String> _amenities = {};
+  final Map<String, DayHours> _openingHours = {};
   bool _isSubmitting = false;
 
   @override
@@ -69,6 +72,7 @@ class _OwnerCreateGymPageState extends State<OwnerCreateGymPage> {
         audience: _audience,
         amenities: _amenities.toList(growable: false),
         subscriptionPlans: const [],
+        openingHours: openingHoursToJson(_openingHours),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -161,6 +165,62 @@ class _OwnerCreateGymPageState extends State<OwnerCreateGymPage> {
           ),
           const SizedBox(height: 14),
 
+          // ── Opening hours ──
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.schedule_rounded,
+                          size: 18, color: AppTheme.gold),
+                      const SizedBox(width: 8),
+                      Text('أوقات الدوام',
+                          style: Theme.of(context).textTheme.titleSmall),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  ...kWeekDayKeys.map((day) {
+                    final label = kWeekDayLabelsAr[day] ?? day;
+                    final hours = _openingHours[day];
+                    final enabled = hours != null;
+                    return _CreateDayHoursRow(
+                      dayLabel: label,
+                      enabled: enabled,
+                      open: hours?.open ?? '',
+                      close: hours?.close ?? '',
+                      onToggle: (val) {
+                        setState(() {
+                          if (val) {
+                            _openingHours[day] =
+                                const DayHours(open: '06:00', close: '22:00');
+                          } else {
+                            _openingHours.remove(day);
+                          }
+                        });
+                      },
+                      onOpenChanged: (val) {
+                        setState(() {
+                          _openingHours[day] = DayHours(
+                              open: val, close: hours?.close ?? '22:00');
+                        });
+                      },
+                      onCloseChanged: (val) {
+                        setState(() {
+                          _openingHours[day] = DayHours(
+                              open: hours?.open ?? '06:00', close: val);
+                        });
+                      },
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
           // ── Subscription Plans ──
           Card(
             child: Padding(
@@ -240,5 +300,115 @@ class _OwnerCreateGymPageState extends State<OwnerCreateGymPage> {
       default:
         return 'رجال ونساء';
     }
+  }
+}
+
+// ── Opening hours row for create gym page ───────────────────────────────────
+class _CreateDayHoursRow extends StatelessWidget {
+  const _CreateDayHoursRow({
+    required this.dayLabel,
+    required this.enabled,
+    required this.open,
+    required this.close,
+    required this.onToggle,
+    required this.onOpenChanged,
+    required this.onCloseChanged,
+  });
+
+  final String dayLabel;
+  final bool enabled;
+  final String open;
+  final String close;
+  final ValueChanged<bool> onToggle;
+  final ValueChanged<String> onOpenChanged;
+  final ValueChanged<String> onCloseChanged;
+
+  static const _times = [
+    '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
+    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+    '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+    '18:00', '19:00', '20:00', '21:00', '22:00', '23:00',
+    '23:59',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 28,
+            child: Switch.adaptive(
+              value: enabled,
+              activeTrackColor: AppTheme.gold,
+              onChanged: onToggle,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 62,
+            child: Text(
+              dayLabel,
+              style: TextStyle(
+                color: enabled ? Colors.white : Colors.grey,
+                fontSize: 13,
+                fontWeight: enabled ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ),
+          if (enabled) ...[
+            const SizedBox(width: 6),
+            _CreateTimePicker(value: open, onChanged: onOpenChanged, times: _times),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Text('–', style: TextStyle(color: Colors.grey, fontSize: 13)),
+            ),
+            _CreateTimePicker(value: close, onChanged: onCloseChanged, times: _times),
+          ] else ...[
+            const Spacer(),
+            const Text('مغلق', style: TextStyle(color: Colors.grey, fontSize: 12)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CreateTimePicker extends StatelessWidget {
+  const _CreateTimePicker({
+    required this.value,
+    required this.onChanged,
+    required this.times,
+  });
+
+  final String value;
+  final ValueChanged<String> onChanged;
+  final List<String> times;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade600),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: times.contains(value) ? value : times.first,
+          isDense: true,
+          style: const TextStyle(fontSize: 13),
+          iconSize: 16,
+          items: times
+              .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+              .toList(growable: false),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
+      ),
+    );
   }
 }

@@ -1,3 +1,62 @@
+/// Represents a single day's opening and closing time.
+class DayHours {
+  const DayHours({required this.open, required this.close});
+
+  final String open; // e.g. "06:00"
+  final String close; // e.g. "22:00"
+
+  factory DayHours.fromJson(Map<String, dynamic> json) {
+    return DayHours(
+      open: (json['open'] ?? '').toString(),
+      close: (json['close'] ?? '').toString(),
+    );
+  }
+
+  Map<String, String> toJson() => {'open': open, 'close': close};
+
+  bool get isEmpty => open.isEmpty && close.isEmpty;
+}
+
+/// 7 days of the week keys used across the app (Arabic gym culture starts Saturday).
+const List<String> kWeekDayKeys = [
+  'saturday',
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+];
+
+const Map<String, String> kWeekDayLabelsAr = {
+  'saturday': 'السبت',
+  'sunday': 'الأحد',
+  'monday': 'الاثنين',
+  'tuesday': 'الثلاثاء',
+  'wednesday': 'الأربعاء',
+  'thursday': 'الخميس',
+  'friday': 'الجمعة',
+};
+
+Map<String, DayHours>? _parseOpeningHours(dynamic raw) {
+  if (raw == null || raw is! Map) return null;
+  final result = <String, DayHours>{};
+  for (final entry in raw.entries) {
+    final key = entry.key.toString().toLowerCase();
+    if (entry.value is Map) {
+      final dh =
+          DayHours.fromJson((entry.value as Map).cast<String, dynamic>());
+      if (!dh.isEmpty) result[key] = dh;
+    }
+  }
+  return result.isEmpty ? null : result;
+}
+
+Map<String, dynamic>? openingHoursToJson(Map<String, DayHours>? hours) {
+  if (hours == null || hours.isEmpty) return null;
+  return hours.map((k, v) => MapEntry(k, v.toJson()));
+}
+
 class GymSummary {
   GymSummary({
     required this.id,
@@ -13,6 +72,7 @@ class GymSummary {
     this.status = 'ACTIVE',
     this.photos = const [],
     this.photoViewUrls = const [],
+    this.openingHours,
   });
 
   final String id;
@@ -28,6 +88,7 @@ class GymSummary {
   final String status;
   final List<String> photos;
   final List<String> photoViewUrls;
+  final Map<String, DayHours>? openingHours;
 
   factory GymSummary.fromJson(Map<String, dynamic> json) {
     final viewRaw = json['photoViewUrls'];
@@ -54,6 +115,7 @@ class GymSummary {
       status: (json['status'] ?? 'ACTIVE').toString(),
       photos: _toStringList(json['photos']),
       photoViewUrls: viewUrls,
+      openingHours: _parseOpeningHours(json['openingHours']),
     );
   }
 }
@@ -73,6 +135,7 @@ class GymDetail {
     required this.products,
     this.subscriptionPlans = const [],
     this.photoViewUrls = const [],
+    this.openingHours,
   });
 
   final String id;
@@ -88,6 +151,7 @@ class GymDetail {
   final List<GymProductItem> products;
   final List<GymSubscriptionPlan> subscriptionPlans;
   final List<String> photoViewUrls;
+  final Map<String, DayHours>? openingHours;
 
   factory GymDetail.fromJson(Map<String, dynamic> json) {
     final facilitiesRaw = json['facilities'];
@@ -130,6 +194,7 @@ class GymDetail {
                   GymSubscriptionPlan.fromJson(item as Map<String, dynamic>))
               .toList(growable: false)
           : const [],
+      openingHours: _parseOpeningHours(json['openingHours']),
     );
   }
 }

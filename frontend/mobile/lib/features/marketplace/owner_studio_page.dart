@@ -56,6 +56,7 @@ class _OwnerStudioPageState extends State<OwnerStudioPage> {
   String? _profileGymId;
   String _selectedAudience = 'MIXED';
   Set<String> _selectedAmenities = <String>{};
+  Map<String, DayHours> _openingHours = {};
 
   // ── expand state ──────────────────────────────────────────────
   bool _facilityExpanded = false;
@@ -169,6 +170,8 @@ class _OwnerStudioPageState extends State<OwnerStudioPage> {
             _profileGymId = _selectedGymId;
             _selectedAudience = selectedGym.audience;
             _selectedAmenities = selectedGym.amenities.toSet();
+            _openingHours = Map<String, DayHours>.from(
+                selectedGym.openingHours ?? {});
           }
 
           if (_selectedGymId != _assetsGymId) {
@@ -210,6 +213,8 @@ class _OwnerStudioPageState extends State<OwnerStudioPage> {
                       _profileGymId = value;
                       _selectedAudience = gym.audience;
                       _selectedAmenities = gym.amenities.toSet();
+                      _openingHours = Map<String, DayHours>.from(
+                          gym.openingHours ?? {});
 
                       // Avoid showing stale form inputs from the previously selected gym.
                       _clearComposers();
@@ -376,6 +381,54 @@ class _OwnerStudioPageState extends State<OwnerStudioPage> {
               );
             }).toList(growable: false),
           ),
+          const SizedBox(height: 22),
+
+          // ── Opening hours ─────────────────────────────────────
+          Row(
+            children: [
+              const Icon(Icons.schedule_rounded,
+                  size: 16, color: AppTheme.gold),
+              const SizedBox(width: 6),
+              Text('أوقات الدوام',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                      color: AppTheme.textSecondary, letterSpacing: 0.4)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...kWeekDayKeys.map((day) {
+            final label = kWeekDayLabelsAr[day] ?? day;
+            final hours = _openingHours[day];
+            final enabled = hours != null;
+            return _DayHoursRow(
+              dayLabel: label,
+              enabled: enabled,
+              open: hours?.open ?? '',
+              close: hours?.close ?? '',
+              onToggle: (val) {
+                setState(() {
+                  if (val) {
+                    _openingHours[day] =
+                        const DayHours(open: '06:00', close: '22:00');
+                  } else {
+                    _openingHours.remove(day);
+                  }
+                });
+              },
+              onOpenChanged: (val) {
+                setState(() {
+                  _openingHours[day] = DayHours(
+                      open: val, close: hours?.close ?? '22:00');
+                });
+              },
+              onCloseChanged: (val) {
+                setState(() {
+                  _openingHours[day] = DayHours(
+                      open: hours?.open ?? '06:00', close: val);
+                });
+              },
+            );
+          }),
+
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
@@ -691,6 +744,7 @@ class _OwnerStudioPageState extends State<OwnerStudioPage> {
         gymId: gymId,
         audience: _selectedAudience,
         amenities: _selectedAmenities.toList(growable: false),
+        openingHours: openingHoursToJson(_openingHours),
       );
       _showMessage('تم تحديث إعدادات النادي');
       setState(() {
@@ -1031,6 +1085,131 @@ class _ErrorState extends StatelessWidget {
         const SizedBox(height: 12),
         ElevatedButton(onPressed: onRetry, child: const Text('إعادة المحاولة')),
       ],
+    );
+  }
+}
+
+// ── Opening hours row widget ────────────────────────────────────────────────
+class _DayHoursRow extends StatelessWidget {
+  const _DayHoursRow({
+    required this.dayLabel,
+    required this.enabled,
+    required this.open,
+    required this.close,
+    required this.onToggle,
+    required this.onOpenChanged,
+    required this.onCloseChanged,
+  });
+
+  final String dayLabel;
+  final bool enabled;
+  final String open;
+  final String close;
+  final ValueChanged<bool> onToggle;
+  final ValueChanged<String> onOpenChanged;
+  final ValueChanged<String> onCloseChanged;
+
+  static const _times = [
+    '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
+    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+    '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+    '18:00', '19:00', '20:00', '21:00', '22:00', '23:00',
+    '23:59',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 28,
+            child: Switch.adaptive(
+              value: enabled,
+              activeTrackColor: AppTheme.gold,
+              onChanged: onToggle,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 62,
+            child: Text(
+              dayLabel,
+              style: TextStyle(
+                color: enabled ? AppTheme.textPrimary : AppTheme.textMuted,
+                fontSize: 13,
+                fontWeight: enabled ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ),
+          if (enabled) ...[
+            const SizedBox(width: 6),
+            _TimePicker(
+              value: open,
+              onChanged: onOpenChanged,
+              times: _times,
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Text('–',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+            ),
+            _TimePicker(
+              value: close,
+              onChanged: onCloseChanged,
+              times: _times,
+            ),
+          ] else ...[
+            const Spacer(),
+            Text('مغلق',
+                style: TextStyle(
+                    color: AppTheme.textMuted.withValues(alpha: 0.5),
+                    fontSize: 12)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TimePicker extends StatelessWidget {
+  const _TimePicker({
+    required this.value,
+    required this.onChanged,
+    required this.times,
+  });
+
+  final String value;
+  final ValueChanged<String> onChanged;
+  final List<String> times;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E35),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.gold.withValues(alpha: 0.2)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: times.contains(value) ? value : times.first,
+          isDense: true,
+          dropdownColor: const Color(0xFF1E1E35),
+          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+          iconEnabledColor: AppTheme.gold,
+          iconSize: 16,
+          items: times
+              .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+              .toList(growable: false),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
+      ),
     );
   }
 }
