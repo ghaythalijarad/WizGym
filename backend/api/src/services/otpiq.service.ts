@@ -1,6 +1,7 @@
 // filepath: apps/api/src/services/otpiq.service.ts
 import https from 'https';
 import http from 'http';
+import { randomBytes, randomInt } from 'crypto';
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 
 interface OTPIQConfig {
@@ -62,10 +63,10 @@ export class OTPIQService {
   }
 
   /**
-   * Generate a 6-digit OTP code
+   * Generate a cryptographically secure 6-digit OTP code
    */
   private generateOTP(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return randomInt(100000, 999999).toString();
   }
 
   /**
@@ -183,12 +184,10 @@ export class OTPIQService {
   }
 
   /**
-   * Generate a random session ID
+   * Generate a cryptographically secure session ID
    */
   private generateSessionId(): string {
-    return Array.from({ length: 32 }, () =>
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('');
+    return randomBytes(16).toString('hex');
   }
 
   /**

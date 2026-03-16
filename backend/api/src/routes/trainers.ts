@@ -16,6 +16,7 @@ import { pushNotification } from "./notifications";
 
 // NOTE: Keep aligned with gyms.ts S3 presign pattern.
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -60,6 +61,11 @@ function userName(event: APIGatewayProxyEventV2): string {
   } catch {
     return raw;
   }
+}
+
+/** Strip characters that could be used for DynamoDB key injection */
+function sanitizeId(id: string): string {
+  return id.replace(/[^a-zA-Z0-9_#@.\-]/g, "").slice(0, 256);
 }
 
 function guessExtFromContentType(contentType: string): string {
@@ -277,7 +283,7 @@ export async function handleTrainers(
     /\/trainers\/me\/subscription-requests\/([^/]+)$/
   );
   if (respondMatch && method === "PATCH") {
-    const requestId = respondMatch[1];
+    const requestId = sanitizeId(respondMatch[1]);
     const uid = userId(event);
     const body = JSON.parse(event.body || "{}");
     const action = (body.action || "").toUpperCase(); // APPROVE | REJECT
@@ -483,7 +489,7 @@ export async function handleTrainers(
   );
   if (deletePlanMatch && method === "DELETE") {
     const uid = userId(event);
-    const planId = deletePlanMatch[1];
+    const planId = sanitizeId(deletePlanMatch[1]);
     await docClient.send(
       new DeleteCommand({
         TableName: TABLE,
@@ -498,7 +504,7 @@ export async function handleTrainers(
     /\/trainers\/([^/]+)\/subscription-plans$/
   );
   if (publicPlansMatch && method === "GET") {
-    const trainerId = decodeURIComponent(publicPlansMatch[1]);
+    const trainerId = sanitizeId(decodeURIComponent(publicPlansMatch[1]));
     const res = await docClient.send(
       new QueryCommand({
         TableName: TABLE,
@@ -530,7 +536,7 @@ export async function handleTrainers(
   // POST /trainers/:trainerId/subscribe — trainee sends subscription request
   const subscribeMatch = path.match(/\/trainers\/([^/]+)\/subscribe$/);
   if (subscribeMatch && method === "POST") {
-    const trainerId = decodeURIComponent(subscribeMatch[1]);
+    const trainerId = sanitizeId(decodeURIComponent(subscribeMatch[1]));
     const uid = userId(event);
     const uName = userName(event);
     const body = JSON.parse(event.body || "{}");
@@ -672,7 +678,7 @@ export async function handleTrainers(
   // Allowed for PENDING requests only (cannot un-approve an active subscription).
   const cancelSubscribeMatch = path.match(/\/trainers\/([^/]+)\/subscribe$/);
   if (cancelSubscribeMatch && method === "DELETE") {
-    const trainerId = decodeURIComponent(cancelSubscribeMatch[1]);
+    const trainerId = sanitizeId(decodeURIComponent(cancelSubscribeMatch[1]));
     const uid = userId(event);
 
     // Fetch the trainee's own record to get the requestId and current status
@@ -761,7 +767,7 @@ export async function handleTrainers(
   // POST /trainers/:trainerId/ratings
   const ratingMatch = path.match(/\/trainers\/([^/]+)\/ratings$/);
   if (ratingMatch && method === "POST") {
-    const trainerId = decodeURIComponent(ratingMatch[1]);
+    const trainerId = sanitizeId(decodeURIComponent(ratingMatch[1]));
     const uid = userId(event);
     const body = JSON.parse(event.body || "{}");
     await docClient.send(
@@ -844,20 +850,43 @@ export async function handleTrainers(
   );
   if (trainerPhotoDeleteMatch && method === "DELETE") {
     const uid = userId(event);
-    const photoId = trainerPhotoDeleteMatch[1];
+    const photoId = sanitizeId(trainerPhotoDeleteMatch[1]);
+
+    // Fetch record first to get S3 key for cleanup
+    const photoRecord = await docClient.send(
+      new GetCommand({
+        TableName: TABLE,
+        Key: { PK: `TRAINER#${uid}`, SK: `PHOTO#${photoId}` },
+      })
+    );
+    const item = photoRecord.Item as Record<string, unknown> | undefined;
+    const s3Key =
+      (item && typeof item["objectKey"] === "string" && item["objectKey"]) ||
+      (item && typeof item["url"] === "string"
+        ? parseS3ObjectKeyFromUrlForBucket(String(item["url"]), TRAINER_CERTS_BUCKET)
+        : null);
+
     await docClient.send(
       new DeleteCommand({
         TableName: TABLE,
         Key: { PK: `TRAINER#${uid}`, SK: `PHOTO#${photoId}` },
       })
     );
+
+    // Delete S3 object (best effort)
+    if (s3Key && TRAINER_CERTS_BUCKET) {
+      s3.send(
+        new DeleteObjectCommand({ Bucket: TRAINER_CERTS_BUCKET, Key: s3Key })
+      ).catch((e) => console.warn("[trainers] S3 photo delete failed:", e));
+    }
+
     return ok({ message: "تم حذف الصورة" });
   }
 
   // ── GET /trainers/:trainerId/photos — public view of trainer gallery ─
   const trainerPublicPhotosMatch = path.match(/\/trainers\/([^/]+)\/photos$/);
   if (trainerPublicPhotosMatch && method === "GET") {
-    const trainerId = decodeURIComponent(trainerPublicPhotosMatch[1]);
+    const trainerId = sanitizeId(decodeURIComponent(trainerPublicPhotosMatch[1]));
     const res = await docClient.send(
       new QueryCommand({
         TableName: TABLE,
@@ -1012,7 +1041,21 @@ export async function handleTrainers(
   const delCertMatch = path.match(/\/trainers\/me\/certificates\/([^/]+)$/);
   if (delCertMatch && method === "DELETE") {
     const uid = userId(event);
-    const certId = delCertMatch[1];
+    const certId = sanitizeId(delCertMatch[1]);
+
+    // Fetch record first to get S3 key for cleanup
+    const certRecord = await docClient.send(
+      new GetCommand({
+        TableName: TABLE,
+        Key: { PK: `TRAINER#${uid}`, SK: `CERT#${certId}` },
+      })
+    );
+    const item = certRecord.Item as Record<string, unknown> | undefined;
+    const s3Key =
+      (item && typeof item["objectKey"] === "string" && item["objectKey"]) ||
+      (item && typeof item["imageUrl"] === "string"
+        ? parseS3ObjectKeyFromUrlForBucket(String(item["imageUrl"]), TRAINER_CERTS_BUCKET)
+        : null);
 
     await docClient.send(
       new DeleteCommand({
@@ -1021,13 +1064,20 @@ export async function handleTrainers(
       })
     );
 
+    // Delete S3 object (best effort)
+    if (s3Key && TRAINER_CERTS_BUCKET) {
+      s3.send(
+        new DeleteObjectCommand({ Bucket: TRAINER_CERTS_BUCKET, Key: s3Key })
+      ).catch((e) => console.warn("[trainers] S3 cert delete failed:", e));
+    }
+
     return ok({ message: "تم حذف الشهادة/الوسام" });
   }
 
   // ─── GET /trainers/:trainerId/public — public trainer profile ───────────
   const publicProfileMatch = path.match(/\/trainers\/([^/]+)\/public$/);
   if (publicProfileMatch && method === "GET") {
-    const trainerId = decodeURIComponent(publicProfileMatch[1]);
+    const trainerId = sanitizeId(decodeURIComponent(publicProfileMatch[1]));
 
     // Fetch the user PROFILE record for this trainer
     const profileRes = await docClient.send(
@@ -1061,7 +1111,7 @@ export async function handleTrainers(
   // ─── GET /trainers/:trainerId/certificates — subscriber-only (max 5) ─────
   const publicCertMatch = path.match(/\/trainers\/([^/]+)\/certificates$/);
   if (publicCertMatch && method === "GET") {
-    const trainerId = decodeURIComponent(publicCertMatch[1]);
+    const trainerId = sanitizeId(decodeURIComponent(publicCertMatch[1]));
     const uid = userId(event);
 
     const allowed = await isTrainerSubscriber(docClient, trainerId, uid);

@@ -1,9 +1,35 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { randomBytes } from 'crypto';
+import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { createHmac, randomBytes, randomInt } from 'crypto';
 import { otpiqService } from '../services/otpiq.service';
+import bcrypt from 'bcryptjs';
+import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 
 const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME || 'wizgym-prod-core';
+const BCRYPT_ROUNDS = 10;
+const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_OTP_ATTEMPTS = 5; // max wrong OTP attempts before lockout
+
+const ssmClient = new SSMClient({ region: process.env.AWS_REGION || 'us-east-1' });
+let cachedJwtSecret: string | null = null;
+
+async function getJwtSecret(): Promise<string> {
+  if (cachedJwtSecret) return cachedJwtSecret;
+  try {
+    const res = await ssmClient.send(
+      new GetParameterCommand({
+        Name: '/wizgym/prod/JWT_SECRET',
+        WithDecryption: true,
+      })
+    );
+    cachedJwtSecret = res.Parameter?.Value || '';
+  } catch (e) {
+    console.error('[Auth] Failed to load JWT secret from SSM:', e);
+    // Fallback to env var (less secure but keeps Lambda functional)
+    cachedJwtSecret = process.env.JWT_SECRET || '';
+  }
+  return cachedJwtSecret;
+}
 
 // Always strip leading + so GSI2PK is consistent: "PHONE#9647831367435"
 function normalizePhone(phone: string): string {
@@ -29,16 +55,29 @@ interface SendOtpRequest {
   phoneNumber: string;
 }
 
-// Simple JWT-like token generation (in production, use proper JWT library)
-function generateToken(userId: string): string {
-  return Buffer.from(JSON.stringify({
-    userId,
-    exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
-  })).toString('base64');
+// ── Secure HMAC-SHA256 JWT ──────────────────────────────────────────────────
+
+async function generateToken(userId: string): Promise<string> {
+  const secret = await getJwtSecret();
+  const payload = {
+    sub: userId,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor((Date.now() + TOKEN_EXPIRY_MS) / 1000),
+  };
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = createHmac('sha256', secret).update(`${header}.${body}`).digest('base64url');
+  return `${header}.${body}.${sig}`;
 }
 
 function generateRefreshToken(): string {
   return randomBytes(32).toString('hex');
+}
+
+// ── Cryptographically secure 6-digit OTP ────────────────────────────────────
+
+function generateSecureOTP(): string {
+  return randomInt(100000, 999999).toString();
 }
 
 export async function handleAuth(
@@ -116,9 +155,36 @@ async function handleLogin(
       };
     }
 
-    // In production, use bcrypt to compare passwords
-    // For now, simple comparison (REPLACE THIS IN PRODUCTION!)
-    if (user.password !== password) {
+    // ── Secure password comparison ──
+    // Support both legacy plaintext (auto-upgrade) and bcrypt hashes
+    const storedPassword = String(user.password || '');
+    let passwordValid = false;
+
+    if (storedPassword.startsWith('$2a$') || storedPassword.startsWith('$2b$')) {
+      // Already bcrypt-hashed
+      passwordValid = await bcrypt.compare(password, storedPassword);
+    } else {
+      // Legacy plaintext — compare, then upgrade to bcrypt
+      passwordValid = storedPassword === password;
+      if (passwordValid) {
+        const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
+        try {
+          await docClient.send(
+            new UpdateCommand({
+              TableName: TABLE_NAME,
+              Key: { PK: user.PK || user.id, SK: 'PROFILE' },
+              UpdateExpression: 'SET password = :hp',
+              ExpressionAttributeValues: { ':hp': hashed },
+            })
+          );
+          console.log(`[Auth] Auto-upgraded plaintext password for ${phone}`);
+        } catch {
+          /* non-fatal */
+        }
+      }
+    }
+
+    if (!passwordValid) {
       return {
         statusCode: 401,
         headers: { 'Content-Type': 'application/json' },
@@ -126,7 +192,7 @@ async function handleLogin(
       };
     }
 
-    const token = generateToken(user.id);
+    const token = await generateToken(user.id);
     const refreshToken = generateRefreshToken();
 
     return {
@@ -188,6 +254,11 @@ async function handleSendOTP(
 
     // Store OTP session in DynamoDB — always store phone WITHOUT + for consistent comparison
     const normalizedPhone = normalizePhone(phoneNumber);
+
+    // Use the cryptographically secure OTP returned by the service,
+    // or generate one if the service didn't provide it
+    const otpCode = otpResponse.otpCode || generateSecureOTP();
+
     await docClient.send(
       new PutCommand({
         TableName: TABLE_NAME,
@@ -195,9 +266,10 @@ async function handleSendOTP(
           PK: `OTP#${sessionId}`,
           SK: `SESSION`,
           phoneNumber: normalizedPhone,
-          code: otpResponse.otpCode || '', // Store the generated code for later comparison
+          code: otpCode,
           expiresAt,
           verified: false,
+          attempts: 0,
           createdAt: new Date().toISOString(),
           ttl: Math.floor(expiresAt / 1000), // DynamoDB TTL
         },
@@ -269,7 +341,26 @@ async function handleVerifyOTP(
       };
     }
 
+    // ── Brute-force protection: max attempts ──
+    const attempts = Number(session.attempts || 0);
+    if (attempts >= MAX_OTP_ATTEMPTS) {
+      return {
+        statusCode: 429,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'تم تجاوز الحد الأقصى من المحاولات. أعد إرسال الرمز.' }),
+      };
+    }
+
     if (session.code !== otp) {
+      // Increment attempt counter
+      await docClient.send(
+        new UpdateCommand({
+          TableName: TABLE_NAME,
+          Key: { PK: `OTP#${sessionId}`, SK: 'SESSION' },
+          UpdateExpression: 'SET attempts = :a',
+          ExpressionAttributeValues: { ':a': attempts + 1 },
+        })
+      );
       return {
         statusCode: 400,
         headers: { 'Content-Type': 'application/json' },
@@ -321,6 +412,15 @@ async function handleSignup(
         statusCode: 400,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: 'جميع الحقول مطلوبة' }),
+      };
+    }
+
+    // Password strength validation
+    if (password.length < 6) {
+      return {
+        statusCode: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'كلمة السر يجب أن تكون 6 أحرف على الأقل' }),
       };
     }
 
@@ -394,9 +494,10 @@ async function handleSignup(
       };
     }
 
-    // Create new user
+    // Create new user with hashed password
     const userId = `USER#${randomBytes(16).toString('hex')}`;
     const userRole = role || 'USER';
+    const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     await docClient.send(
       new PutCommand({
@@ -408,7 +509,7 @@ async function handleSignup(
           GSI2SK: `ROLE#${userRole}#${userId}`,
           id: userId,
           phoneNumber: requestPhone,
-          password, // In production, hash this with bcrypt!
+          password: hashedPassword,
           displayName: displayName || '',
           role: userRole,
           createdAt: new Date().toISOString(),
@@ -417,7 +518,7 @@ async function handleSignup(
       })
     );
 
-    const token = generateToken(userId);
+    const token = await generateToken(userId);
     const refreshToken = generateRefreshToken();
 
     return {

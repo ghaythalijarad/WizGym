@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>WizGym يحتاج الوصول إلى الكاميرا لالتقاط الصور</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>WizGym يحتاج الوصول إلى معرض الصور لاختيار صورة</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoadsInLocalNetworking</key>

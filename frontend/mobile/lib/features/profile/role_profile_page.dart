@@ -292,8 +292,6 @@ class _RoleProfilePageState extends State<RoleProfilePage> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final isTrainer = widget.role == AppRole.trainer;
-
     return RefreshIndicator(
       onRefresh: _reload,
       child: FutureBuilder<_ProfileData>(
@@ -347,7 +345,7 @@ class _RoleProfilePageState extends State<RoleProfilePage> {
                   children: [
                     // Avatar with tap to change
                     GestureDetector(
-                      onTap: isTrainer ? _pickAndUploadAvatar : null,
+                      onTap: _pickAndUploadAvatar,
                       child: Stack(
                         children: [
                           Container(
@@ -382,8 +380,7 @@ class _RoleProfilePageState extends State<RoleProfilePage> {
                                 : const Icon(Icons.person_rounded,
                                     color: AppTheme.black, size: 36),
                           ),
-                          if (isTrainer)
-                            Positioned(
+                          Positioned(
                               bottom: 0,
                               right: 0,
                               child: Container(
@@ -431,7 +428,7 @@ class _RoleProfilePageState extends State<RoleProfilePage> {
                                   fontWeight: FontWeight.w700,
                                 )),
                           ),
-                          if (isTrainer && data.avatarUrl != null) ...[
+                          if (data.avatarUrl != null) ...[
                             const SizedBox(height: 6),
                             GestureDetector(
                               onTap: _removeAvatar,
@@ -475,7 +472,7 @@ class _RoleProfilePageState extends State<RoleProfilePage> {
               ],
 
               // ── Bio (trainer only) ────────────────────────────────────────
-              if (isTrainer) ...[
+              if (widget.role == AppRole.trainer) ...[
                 const SizedBox(height: 10),
                 _PremiumCard(
                   accentColor: AppTheme.gold,

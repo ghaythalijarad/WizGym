@@ -25,3 +25,6 @@ npm-debug.log*
 *.tfstate
 *.tfstate.*
 terraform.tfvars
+
+# SAM build artifacts
+.aws-sam/

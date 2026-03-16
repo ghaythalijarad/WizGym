@@ -1,5 +1,7 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
+import { createHmac } from "crypto";
 import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyResultV2,
@@ -26,6 +28,76 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 };
 
+// ── JWT verification ──────────────────────────────────────────────────────────
+
+const ssmClient = new SSMClient({ region: process.env.AWS_REGION || "us-east-1" });
+let cachedJwtSecret: string | null = null;
+
+async function getJwtSecret(): Promise<string> {
+  if (cachedJwtSecret) return cachedJwtSecret;
+  try {
+    const res = await ssmClient.send(
+      new GetParameterCommand({
+        Name: "/wizgym/prod/JWT_SECRET",
+        WithDecryption: true,
+      })
+    );
+    cachedJwtSecret = res.Parameter?.Value || "";
+  } catch (e) {
+    console.error("[Handler] Failed to load JWT_SECRET:", e);
+    cachedJwtSecret = process.env.JWT_SECRET || "";
+  }
+  return cachedJwtSecret;
+}
+
+/**
+ * Verify HMAC-SHA256 JWT from Authorization: Bearer <token>.
+ * Returns the payload (with `sub` = userId) or null if invalid.
+ */
+async function verifyJwt(
+  authHeader: string | undefined
+): Promise<{ sub: string; iat: number; exp: number } | null> {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
+  const token = authHeader.slice(7).trim();
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+
+  const [header, body, sig] = parts;
+  const secret = await getJwtSecret();
+  if (!secret) return null;
+
+  const expected = createHmac("sha256", secret)
+    .update(`${header}.${body}`)
+    .digest("base64url");
+  if (expected !== sig) return null;
+
+  try {
+    const payload = JSON.parse(
+      Buffer.from(body, "base64url").toString("utf8")
+    );
+    if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+// Routes that do NOT require user JWT verification.
+// Admin routes use their own token (ADMIN_JWT_SECRET) verified inside admin.ts.
+const PUBLIC_PATH_PATTERNS = [
+  /\/api\/v1\/health$/,
+  /\/api\/v1\/auth\//,
+  /\/api\/v1\/gyms\/public/,
+  /\/api\/v1\/subscriptions\/plans/,
+  /\/api\/v1\/admin\//,
+];
+
+function isPublicRoute(path: string): boolean {
+  return PUBLIC_PATH_PATTERNS.some((p) => p.test(path));
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function notFound(path: string): APIGatewayProxyResultV2 {
   return {
     statusCode: 404,
@@ -33,6 +105,8 @@ function notFound(path: string): APIGatewayProxyResultV2 {
     body: JSON.stringify({ message: "Not Found", path }),
   };
 }
+
+// ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function handler(
   event: APIGatewayProxyEventV2
@@ -48,6 +122,30 @@ export async function handler(
   }
 
   try {
+    // ── JWT enforcement for authenticated routes ──────────────────────────
+    // Public routes skip token verification.
+    // For all non-public routes: require a valid JWT. The verified
+    // identity (sub claim) overrides x-user-id to prevent spoofing.
+    // If no valid JWT is present, return 401.
+
+    if (!isPublicRoute(path)) {
+      const authHeader =
+        event.headers?.["authorization"] || event.headers?.["Authorization"];
+      const jwtPayload = await verifyJwt(authHeader);
+
+      if (jwtPayload) {
+        // Verified — inject the trusted userId into the headers
+        event.headers["x-user-id"] = jwtPayload.sub;
+      } else {
+        // Strict mode: reject unauthenticated requests to protected routes
+        return {
+          statusCode: 401,
+          headers: CORS_HEADERS,
+          body: JSON.stringify({ message: "غير مصرح — يرجى تسجيل الدخول" }),
+        };
+      }
+    }
+
     // Health
     if (path.endsWith("/api/v1/health")) {
       return {

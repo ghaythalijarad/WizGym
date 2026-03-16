@@ -1,4 +1,5 @@
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -69,6 +70,11 @@ function userName(event: APIGatewayProxyEventV2): string {
   } catch {
     return raw;
   }
+}
+
+/** Strip characters that could be used for DynamoDB key injection */
+function sanitizeId(id: string): string {
+  return id.replace(/[^a-zA-Z0-9_#@.\-]/g, "").slice(0, 256);
 }
 
 async function assertGymOwnerOrAdmin(
@@ -483,7 +489,7 @@ export async function handleGyms(
   // GET /gyms/:gymId/public — gym detail
   const detailMatch = path.match(/\/gyms\/([^/]+)\/public$/);
   if (detailMatch && method === "GET") {
-    const gymId = detailMatch[1];
+    const gymId = sanitizeId(detailMatch[1]);
     const profileRes = await docClient.send(
       new GetCommand({
         TableName: TABLE,
@@ -628,7 +634,7 @@ export async function handleGyms(
   // ─── PATCH /gyms/:gymId/profile — update gym profile ──────────────
   const profilePatch = path.match(/\/gyms\/([^/]+)\/profile$/);
   if (profilePatch && method === "PATCH") {
-    const gymId = profilePatch[1];
+    const gymId = sanitizeId(profilePatch[1]);
 
     const authErr = await assertGymOwnerOrAdmin(docClient, event, gymId);
     if (authErr) return authErr;
@@ -690,7 +696,7 @@ export async function handleGyms(
   // ─── GET /gyms/:gymId/trainers — list gym trainers ─────────────────
   const trainersMatch = path.match(/\/gyms\/([^/]+)\/trainers$/);
   if (trainersMatch && method === "GET") {
-    const gymId = trainersMatch[1];
+    const gymId = sanitizeId(trainersMatch[1]);
     const res = await docClient.send(
       new QueryCommand({
         TableName: TABLE,
@@ -713,7 +719,7 @@ export async function handleGyms(
   // ─── POST /gyms/:gymId/trainers/join — trainer joins a gym ─────────
   const trainerJoinMatch = path.match(/\/gyms\/([^/]+)\/trainers\/join$/);
   if (trainerJoinMatch && method === "POST") {
-    const gymId = trainerJoinMatch[1];
+    const gymId = sanitizeId(trainerJoinMatch[1]);
     const uid = userId(event);
     const uName = userName(event);
     const now = new Date().toISOString();
@@ -807,7 +813,7 @@ export async function handleGyms(
   // ─── DELETE /gyms/:gymId/trainers/me — trainer leaves a gym ────────
   const trainerLeaveMatch = path.match(/\/gyms\/([^/]+)\/trainers\/me$/);
   if (trainerLeaveMatch && method === "DELETE") {
-    const gymId = trainerLeaveMatch[1];
+    const gymId = sanitizeId(trainerLeaveMatch[1]);
     const uid = userId(event);
     const now = new Date().toISOString();
 
@@ -842,8 +848,8 @@ export async function handleGyms(
   // ─── POST /gyms/:gymId/trainers/:trainerId/hire — hire trainer ─────
   const hireMatch = path.match(/\/gyms\/([^/]+)\/trainers\/([^/]+)\/hire$/);
   if (hireMatch && method === "POST") {
-    const gymId = hireMatch[1];
-    const trainerId = decodeURIComponent(hireMatch[2]);
+    const gymId = sanitizeId(hireMatch[1]);
+    const trainerId = sanitizeId(decodeURIComponent(hireMatch[2]));
     const now = new Date().toISOString();
 
     await docClient.send(
@@ -861,7 +867,7 @@ export async function handleGyms(
   // ─── POST /gyms/:gymId/join — user joins gym ──────────────────────
   const joinMatch = path.match(/\/gyms\/([^/]+)\/join$/);
   if (joinMatch && method === "POST") {
-    const gymId = joinMatch[1];
+    const gymId = sanitizeId(joinMatch[1]);
     const uid = userId(event);
     const uName = userName(event);
     const body = JSON.parse(event.body || "{}");
@@ -1143,7 +1149,7 @@ export async function handleGyms(
   // ─── GET /gyms/:gymId/members — list gym members ───────────────────
   const membersListMatch = path.match(/\/gyms\/([^/]+)\/members$/);
   if (membersListMatch && method === "GET") {
-    const gymId = membersListMatch[1];
+    const gymId = sanitizeId(membersListMatch[1]);
     const statusFilter = params["status"];
 
     const res = await docClient.send(
@@ -1202,8 +1208,8 @@ export async function handleGyms(
   // ─── PATCH /gyms/:gymId/members/:memberId — approve/reject member ─
   const memberActionMatch = path.match(/\/gyms\/([^/]+)\/members\/([^/]+)$/);
   if (memberActionMatch && method === "PATCH") {
-    const gymId = memberActionMatch[1];
-    const memberId = decodeURIComponent(memberActionMatch[2]);
+    const gymId = sanitizeId(memberActionMatch[1]);
+    const memberId = sanitizeId(decodeURIComponent(memberActionMatch[2]));
     const body = JSON.parse(event.body || "{}");
     const action = (body.action || "").toUpperCase();
 
@@ -1365,8 +1371,8 @@ export async function handleGyms(
     /\/gyms\/([^/]+)\/subscription-plans\/([^/]+)$/
   );
   if (planUpdateMatch && method === "PATCH") {
-    const gymId = planUpdateMatch[1];
-    const planId = planUpdateMatch[2];
+    const gymId = sanitizeId(planUpdateMatch[1]);
+    const planId = sanitizeId(planUpdateMatch[2]);
     const body = JSON.parse(event.body || "{}");
     const now = new Date().toISOString();
 
@@ -1417,8 +1423,8 @@ export async function handleGyms(
 
   // DELETE /gyms/:gymId/subscription-plans/:planId — delete plan
   if (planUpdateMatch && method === "DELETE") {
-    const gymId = planUpdateMatch[1];
-    const planId = planUpdateMatch[2];
+    const gymId = sanitizeId(planUpdateMatch[1]);
+    const planId = sanitizeId(planUpdateMatch[2]);
 
     await docClient.send(
       new DeleteCommand({
@@ -1433,7 +1439,7 @@ export async function handleGyms(
   // POST /gyms/:gymId/subscription-plans — create plan
   const planListMatch = path.match(/\/gyms\/([^/]+)\/subscription-plans$/);
   if (planListMatch && method === "POST") {
-    const gymId = planListMatch[1];
+    const gymId = sanitizeId(planListMatch[1]);
     const body = JSON.parse(event.body || "{}");
     const planId = randomBytes(6).toString("hex");
     const now = new Date().toISOString();
@@ -1462,7 +1468,7 @@ export async function handleGyms(
 
   // GET /gyms/:gymId/subscription-plans — list plans
   if (planListMatch && method === "GET") {
-    const gymId = planListMatch[1];
+    const gymId = sanitizeId(planListMatch[1]);
     const res = await docClient.send(
       new QueryCommand({
         TableName: TABLE,
@@ -1487,7 +1493,7 @@ export async function handleGyms(
   // ─── POST /gyms/:gymId/ratings — rate a gym ────────────────────────
   const ratingMatch = path.match(/\/gyms\/([^/]+)\/ratings$/);
   if (ratingMatch && method === "POST") {
-    const gymId = ratingMatch[1];
+    const gymId = sanitizeId(ratingMatch[1]);
     const uid = userId(event);
     const body = JSON.parse(event.body || "{}");
     const now = new Date().toISOString();
@@ -1513,7 +1519,7 @@ export async function handleGyms(
   // ─── POST /gyms/:gymId/facilities — create facility ────────────────
   const facilityMatch = path.match(/\/gyms\/([^/]+)\/facilities$/);
   if (facilityMatch && method === "POST") {
-    const gymId = facilityMatch[1];
+    const gymId = sanitizeId(facilityMatch[1]);
     const body = JSON.parse(event.body || "{}");
     const facilityId = randomBytes(6).toString("hex");
     const now = new Date().toISOString();
@@ -1539,7 +1545,7 @@ export async function handleGyms(
   // ─── POST /gyms/:gymId/products — create product ───────────────────
   const productMatch = path.match(/\/gyms\/([^/]+)\/products$/);
   if (productMatch && method === "POST") {
-    const gymId = productMatch[1];
+    const gymId = sanitizeId(productMatch[1]);
     const body = JSON.parse(event.body || "{}");
     const productId = randomBytes(6).toString("hex");
     const now = new Date().toISOString();
@@ -1567,7 +1573,7 @@ export async function handleGyms(
   // ─── GET /gyms/:gymId/photos — list gym photos ──────────────────────
   const gymPhotosMatch = path.match(/\/gyms\/([^/]+)\/photos$/);
   if (gymPhotosMatch && method === "GET") {
-    const gymId = gymPhotosMatch[1];
+    const gymId = sanitizeId(gymPhotosMatch[1]);
     const res = await docClient.send(
       new QueryCommand({
         TableName: TABLE,
@@ -1591,7 +1597,7 @@ export async function handleGyms(
   // ─── POST /gyms/:gymId/photos/presign — get pre-signed S3 upload URL ─
   const gymPhotosPresignMatch = path.match(/\/gyms\/([^/]+)\/photos\/presign$/);
   if (gymPhotosPresignMatch && method === "POST") {
-    const gymId = gymPhotosPresignMatch[1];
+    const gymId = sanitizeId(gymPhotosPresignMatch[1]);
 
     const authErr = await assertGymOwnerOrAdmin(docClient, event, gymId);
     if (authErr) return authErr;
@@ -1638,7 +1644,7 @@ export async function handleGyms(
 
   // ─── POST /gyms/:gymId/photos — upload gym photo (max 5) ────────────
   if (gymPhotosMatch && method === "POST") {
-    const gymId = gymPhotosMatch[1];
+    const gymId = sanitizeId(gymPhotosMatch[1]);
 
     const authErr = await assertGymOwnerOrAdmin(docClient, event, gymId);
     if (authErr) return authErr;
@@ -1688,8 +1694,8 @@ export async function handleGyms(
     /\/gyms\/([^/]+)\/photos\/([^/]+)\/view-url$/
   );
   if (gymPhotoViewUrlMatch && method === "GET") {
-    const gymId = gymPhotoViewUrlMatch[1];
-    const photoId = gymPhotoViewUrlMatch[2];
+    const gymId = sanitizeId(gymPhotoViewUrlMatch[1]);
+    const photoId = sanitizeId(gymPhotoViewUrlMatch[2]);
 
     // Public viewing is allowed (no auth) since these are gym gallery photos,
     // but the bucket/object can remain private.
@@ -1731,18 +1737,41 @@ export async function handleGyms(
   // ─── DELETE /gyms/:gymId/photos/:photoId — delete gym photo ─────────
   const gymPhotoDeleteMatch = path.match(/\/gyms\/([^/]+)\/photos\/([^/]+)$/);
   if (gymPhotoDeleteMatch && method === "DELETE") {
-    const gymId = gymPhotoDeleteMatch[1];
-    const photoId = gymPhotoDeleteMatch[2];
+    const gymId = sanitizeId(gymPhotoDeleteMatch[1]);
+    const photoId = sanitizeId(gymPhotoDeleteMatch[2]);
 
     const authErr = await assertGymOwnerOrAdmin(docClient, event, gymId);
     if (authErr) return authErr;
 
+    // Fetch the record first to get the S3 object key
+    const photoRecord = await docClient.send(
+      new GetCommand({
+        TableName: TABLE,
+        Key: { PK: `GYM#${gymId}`, SK: `PHOTO#${photoId}` },
+      })
+    );
+    const item = photoRecord.Item as Record<string, unknown> | undefined;
+    const s3Key =
+      (item && typeof item["objectKey"] === "string" && item["objectKey"]) ||
+      (item && typeof item["url"] === "string"
+        ? parseS3ObjectKeyFromUrl(String(item["url"]))
+        : null);
+
+    // Delete DynamoDB record
     await docClient.send(
       new DeleteCommand({
         TableName: TABLE,
         Key: { PK: `GYM#${gymId}`, SK: `PHOTO#${photoId}` },
       })
     );
+
+    // Delete S3 object (best effort — don't fail the request if this errors)
+    if (s3Key && GYM_PHOTOS_BUCKET) {
+      s3.send(
+        new DeleteObjectCommand({ Bucket: GYM_PHOTOS_BUCKET, Key: s3Key })
+      ).catch((e) => console.warn("[gyms] S3 photo delete failed:", e));
+    }
+
     return ok({ message: "تم حذف الصورة" });
   }
 
@@ -1751,7 +1780,7 @@ export async function handleGyms(
     /\/gyms\/([^/]+)\/subscription-requests\/presign$/
   );
   if (subReqPresignMatch && method === "POST") {
-    const gymId = subReqPresignMatch[1];
+    const gymId = sanitizeId(subReqPresignMatch[1]);
 
     const authErr = await assertGymOwnerOrAdmin(docClient, event, gymId);
     if (authErr) return authErr;
@@ -1788,7 +1817,7 @@ export async function handleGyms(
     /\/gyms\/([^/]+)\/subscription-requests$/
   );
   if (subReqCreateMatch && method === "POST") {
-    const gymId = subReqCreateMatch[1];
+    const gymId = sanitizeId(subReqCreateMatch[1]);
 
     const authErr = await assertGymOwnerOrAdmin(docClient, event, gymId);
     if (authErr) return authErr;

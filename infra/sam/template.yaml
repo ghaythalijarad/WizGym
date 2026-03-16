@@ -5,7 +5,7 @@ Description: WizGym API - AWS SAM (Lambda + HTTP API)
 Globals:
   Function:
     Runtime: nodejs22.x
-    MemorySize: 512
+    MemorySize: 256
     Timeout: 10
     Tracing: Active
     Environment:
@@ -22,6 +22,10 @@ Resources:
   ApiGatewayHttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
+      StageName: '$default'
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 50
+        ThrottlingRateLimit: 100
       CorsConfiguration:
         AllowOrigins:
           - '*'
@@ -33,7 +37,11 @@ Resources:
           - DELETE
           - OPTIONS
         AllowHeaders:
-          - '*'
+          - Content-Type
+          - Authorization
+          - x-user-id
+          - x-user-role
+          - x-user-name
 
   SubscriptionProofsBucket:
     Type: AWS::S3::Bucket
@@ -47,6 +55,15 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: CleanupIncompleteUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+          - Id: ExpireOldProofs
+            Status: Enabled
+            ExpirationInDays: 365
       CorsConfiguration:
         CorsRules:
           - AllowedMethods: [PUT, GET, HEAD]
@@ -67,6 +84,12 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: CleanupIncompleteUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
       CorsConfiguration:
         CorsRules:
           - AllowedMethods: [PUT, GET, HEAD]
@@ -80,6 +103,7 @@ Resources:
     Properties:
       CodeUri: ../../backend/api
       Handler: dist/handler.handler
+      MemorySize: 256
       Events:
         Health:
           Type: HttpApi
@@ -126,7 +150,7 @@ Resources:
         Target: es2020
         Platform: node
         Sourcemap: true
-        Minify: false
+        Minify: true
         External:
           - '@aws-sdk/*'
 
@@ -137,7 +161,7 @@ Resources:
       CodeUri: ../../backend/api
       Handler: dist/handlers/expiry-checker.handler
       Description: Nightly job — deactivates GYM SUBSCRIPTION items whose expiresAt has passed
-      MemorySize: 256
+      MemorySize: 128
       Timeout: 60
       Events:
         NightlyExpiry:
@@ -157,7 +181,7 @@ Resources:
         Target: es2020
         Platform: node
         Sourcemap: true
-        Minify: false
+        Minify: true
         External:
           - '@aws-sdk/*'
 

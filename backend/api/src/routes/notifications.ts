@@ -89,7 +89,14 @@ export async function handleNotifications(
   }
 
   // ─── POST /notifications — create a notification (internal/admin use) ───
+  // SECURITY: This endpoint should only be called internally (from other routes
+  // via pushNotification helper) or by admins. Block direct external calls.
   if (path.endsWith('/notifications') && method === 'POST') {
+    const callerRole = (event.headers?.['x-user-role'] || event.headers?.['X-User-Role'] || '').toUpperCase();
+    if (callerRole !== 'ADMIN' && callerRole !== 'SUPERADMIN') {
+      return err(403, 'غير مصرح — فقط المشرفون يمكنهم إنشاء إشعارات');
+    }
+
     const body = JSON.parse(event.body || '{}');
     const targetUserId = body.targetUserId as string | undefined;
     const isBroadcast = body.broadcast === true;
