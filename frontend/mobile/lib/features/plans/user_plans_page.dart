@@ -312,9 +312,9 @@ class _UserPlansPageState extends State<UserPlansPage> {
 
 class _Exercise {
   final nameController = TextEditingController();
-  final setsController = TextEditingController();
-  final repsController = TextEditingController();
-  final restController = TextEditingController();
+  final setsController = TextEditingController(text: '3');
+  final repsController = TextEditingController(text: '12');
+  final restController = TextEditingController(text: '60');
   final notesController = TextEditingController();
 
   void dispose() {
@@ -487,15 +487,16 @@ class _DayCard extends StatelessWidget {
                     controller: day.nameController,
                     onChanged: (_) => onStateChanged(),
                     textAlign: TextAlign.right,
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600, fontSize: 17),
                     decoration: InputDecoration(
                       hintText: 'اليوم ${dayIndex + 1} – مثال: صدر وترايسبس',
-                      hintStyle: theme.textTheme.bodySmall
-                          ?.copyWith(color: scheme.onSurfaceVariant),
-                      isDense: true,
+                      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant, fontSize: 15),
+                      isDense: false,
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
+                      contentPadding:
+                          const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
                 ),

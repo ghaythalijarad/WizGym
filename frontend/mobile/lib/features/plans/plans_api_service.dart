@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../core/auth/auth_events.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/app_role.dart';
@@ -231,6 +232,10 @@ class PlansApiService {
   }
 
   dynamic _decodeResponse(http.Response response) {
+    if (response.statusCode == 401) {
+      AuthEvents.emitUnauthorized();
+      throw Exception('Unauthorized — session expired');
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(
           'Request failed: ${response.statusCode} ${response.body}');

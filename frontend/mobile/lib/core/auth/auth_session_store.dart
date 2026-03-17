@@ -32,7 +32,27 @@ class AuthSessionStore {
     for (final key in _keys) {
       map[key] = await _secure.read(key: '$_prefix$key');
     }
-    return AuthSession.fromMap(map);
+    final session = AuthSession.fromMap(map);
+
+    // ── Validate token format ──────────────────────────────────────
+    // After the security upgrade, tokens are proper HMAC-SHA256 JWTs
+    // (header.payload.signature — 3 dot-separated parts).
+    // Old base64-only tokens must be discarded to force re-login.
+    if (session != null && !_isValidJwtFormat(session.token)) {
+      // ignore: avoid_print
+      print('[AuthSessionStore] Stale pre-JWT token detected — clearing session');
+      await clear();
+      return null;
+    }
+
+    return session;
+  }
+
+  /// Returns true if the token looks like a standard 3-part JWT.
+  static bool _isValidJwtFormat(String token) {
+    if (token.isEmpty) return false;
+    final parts = token.split('.');
+    return parts.length == 3 && parts.every((p) => p.isNotEmpty);
   }
 
   Future<void> save(AuthSession session) async {

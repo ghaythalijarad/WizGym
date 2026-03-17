@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import 'core/auth/auth_events.dart';
 import 'core/auth/auth_session.dart';
 import 'core/auth/auth_session_store.dart';
 import 'core/notifications/notification_service.dart';
@@ -23,15 +26,18 @@ class _GymOsAppState extends State<GymOsApp> {
   AuthSession? _session;
   final AuthSessionStore _sessionStore = AuthSessionStore();
   final AppLocaleController _localeController = AppLocaleController();
+  StreamSubscription<void>? _authSub;
 
   @override
   void initState() {
     super.initState();
+    _authSub = AuthEvents.onUnauthorized.listen((_) => _onLogout());
     _restoreSession();
   }
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _localeController.dispose();
     super.dispose();
   }

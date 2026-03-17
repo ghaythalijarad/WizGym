@@ -576,9 +576,9 @@ class _TrainerPlansPageState extends State<TrainerPlansPage> {
 
 class _Exercise {
   final nameController = TextEditingController();
-  final setsController = TextEditingController();
-  final repsController = TextEditingController();
-  final restController = TextEditingController();
+  final setsController = TextEditingController(text: '3');
+  final repsController = TextEditingController(text: '12');
+  final restController = TextEditingController(text: '60');
   final notesController = TextEditingController();
 
   void dispose() {
@@ -749,16 +749,18 @@ class _DayCard extends StatelessWidget {
                     controller: day.nameController,
                     onChanged: (_) => onStateChanged(),
                     textAlign: TextAlign.right,
-                    style: theme.textTheme.titleSmall?.copyWith(
+                    style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
+                        fontSize: 17,
                         color: AppTheme.textPrimary),
                     decoration: InputDecoration(
                       hintText: 'اليوم ${dayIndex + 1} – مثال: صدر وترايسبس',
-                      hintStyle: theme.textTheme.bodySmall
-                          ?.copyWith(color: AppTheme.textMuted),
-                      isDense: true,
+                      hintStyle: theme.textTheme.bodyMedium
+                          ?.copyWith(color: AppTheme.textMuted, fontSize: 15),
+                      isDense: false,
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
+                      contentPadding:
+                          const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
                 ),
