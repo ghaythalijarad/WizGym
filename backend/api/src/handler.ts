@@ -1,11 +1,11 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
-import { createHmac } from "crypto";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyResultV2,
 } from "aws-lambda";
+import { createHmac } from "crypto";
 import { handleAdmin } from "./routes/admin";
 import { handleAnalytics } from "./routes/analytics";
 import { handleAuth } from "./routes/auth";
@@ -30,7 +30,9 @@ const CORS_HEADERS = {
 
 // ── JWT verification ──────────────────────────────────────────────────────────
 
-const ssmClient = new SSMClient({ region: process.env.AWS_REGION || "us-east-1" });
+const ssmClient = new SSMClient({
+  region: process.env.AWS_REGION || "us-east-1",
+});
 let cachedJwtSecret: string | null = null;
 
 async function getJwtSecret(): Promise<string> {
@@ -72,9 +74,7 @@ async function verifyJwt(
   if (expected !== sig) return null;
 
   try {
-    const payload = JSON.parse(
-      Buffer.from(body, "base64url").toString("utf8")
-    );
+    const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
     if (payload.exp < Math.floor(Date.now() / 1000)) return null;
     return payload;
   } catch {

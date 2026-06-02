@@ -5,13 +5,13 @@ import 'package:flutter/material.dart';
 import 'core/auth/auth_events.dart';
 import 'core/auth/auth_session.dart';
 import 'core/auth/auth_session_store.dart';
+import 'core/localization/app_locale_controller.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_gate_page.dart';
 import 'features/splash/splash_page.dart';
-import 'shared/widgets/role_shell.dart';
-import 'core/localization/app_locale_controller.dart';
 import 'l10n/app_localizations.dart';
+import 'shared/widgets/role_shell.dart';
 
 class GymOsApp extends StatefulWidget {
   const GymOsApp({super.key});

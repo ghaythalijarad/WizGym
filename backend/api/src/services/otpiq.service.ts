@@ -1,8 +1,8 @@
 // filepath: apps/api/src/services/otpiq.service.ts
-import https from 'https';
-import http from 'http';
+import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
 import { randomBytes, randomInt } from 'crypto';
-import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
+import http from "http";
+import https from "https";
 
 interface OTPIQConfig {
   apiKey: string;

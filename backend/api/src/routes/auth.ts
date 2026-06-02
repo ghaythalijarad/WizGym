@@ -1,16 +1,27 @@
-import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { createHmac, randomBytes, randomInt } from 'crypto';
-import { otpiqService } from '../services/otpiq.service';
-import bcrypt from 'bcryptjs';
-import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
+import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
+import {
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
+import type {
+  APIGatewayProxyEventV2,
+  APIGatewayProxyResultV2,
+} from "aws-lambda";
+import bcrypt from "bcryptjs";
+import { createHmac, randomBytes, randomInt } from "crypto";
+import { otpiqService } from "../services/otpiq.service";
 
-const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME || 'wizgym-prod-core';
+const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME || "wizgym-prod-core";
 const BCRYPT_ROUNDS = 10;
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 const MAX_OTP_ATTEMPTS = 5; // max wrong OTP attempts before lockout
 
-const ssmClient = new SSMClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const ssmClient = new SSMClient({
+  region: process.env.AWS_REGION || "us-east-1",
+});
 let cachedJwtSecret: string | null = null;
 
 async function getJwtSecret(): Promise<string> {
@@ -18,22 +29,22 @@ async function getJwtSecret(): Promise<string> {
   try {
     const res = await ssmClient.send(
       new GetParameterCommand({
-        Name: '/wizgym/prod/JWT_SECRET',
+        Name: "/wizgym/prod/JWT_SECRET",
         WithDecryption: true,
       })
     );
-    cachedJwtSecret = res.Parameter?.Value || '';
+    cachedJwtSecret = res.Parameter?.Value || "";
   } catch (e) {
-    console.error('[Auth] Failed to load JWT secret from SSM:', e);
+    console.error("[Auth] Failed to load JWT secret from SSM:", e);
     // Fallback to env var (less secure but keeps Lambda functional)
-    cachedJwtSecret = process.env.JWT_SECRET || '';
+    cachedJwtSecret = process.env.JWT_SECRET || "";
   }
   return cachedJwtSecret;
 }
 
 // Always strip leading + so GSI2PK is consistent: "PHONE#9647831367435"
 function normalizePhone(phone: string): string {
-  return phone.replace(/^\+/, '');
+  return phone.replace(/^\+/, "");
 }
 
 interface LoginRequest {
@@ -64,14 +75,18 @@ async function generateToken(userId: string): Promise<string> {
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor((Date.now() + TOKEN_EXPIRY_MS) / 1000),
   };
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const sig = createHmac('sha256', secret).update(`${header}.${body}`).digest('base64url');
+  const header = Buffer.from(
+    JSON.stringify({ alg: "HS256", typ: "JWT" })
+  ).toString("base64url");
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const sig = createHmac("sha256", secret)
+    .update(`${header}.${body}`)
+    .digest("base64url");
   return `${header}.${body}.${sig}`;
 }
 
 function generateRefreshToken(): string {
-  return randomBytes(32).toString('hex');
+  return randomBytes(32).toString("hex");
 }
 
 // ── Cryptographically secure 6-digit OTP ────────────────────────────────────
@@ -84,33 +99,33 @@ export async function handleAuth(
   event: APIGatewayProxyEventV2,
   docClient: DynamoDBDocumentClient
 ): Promise<APIGatewayProxyResultV2> {
-  const path = event.rawPath || '';
+  const path = event.rawPath || "";
   const method = event.requestContext.http.method;
 
   // Handle login
-  if (path.endsWith('/auth/login') && method === 'POST') {
+  if (path.endsWith("/auth/login") && method === "POST") {
     return await handleLogin(event, docClient);
   }
 
   // Handle signup
-  if (path.endsWith('/auth/signup') && method === 'POST') {
+  if (path.endsWith("/auth/signup") && method === "POST") {
     return await handleSignup(event, docClient);
   }
 
   // Handle send OTP
-  if (path.endsWith('/auth/phone/send-otp') && method === 'POST') {
+  if (path.endsWith("/auth/phone/send-otp") && method === "POST") {
     return await handleSendOTP(event, docClient);
   }
 
   // Handle verify OTP
-  if (path.endsWith('/auth/phone/verify-otp') && method === 'POST') {
+  if (path.endsWith("/auth/phone/verify-otp") && method === "POST") {
     return await handleVerifyOTP(event, docClient);
   }
 
   return {
     statusCode: 404,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: 'Auth endpoint not found' }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: "Auth endpoint not found" }),
   };
 }
 
@@ -119,14 +134,14 @@ async function handleLogin(
   docClient: DynamoDBDocumentClient
 ): Promise<APIGatewayProxyResultV2> {
   try {
-    const body: LoginRequest = JSON.parse(event.body || '{}');
+    const body: LoginRequest = JSON.parse(event.body || "{}");
     const { phoneNumber, role, password } = body;
 
     if (!phoneNumber || !password) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'رقم الهاتف وكلمة السر مطلوبان' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "رقم الهاتف وكلمة السر مطلوبان" }),
       };
     }
 
@@ -136,31 +151,34 @@ async function handleLogin(
     const result = await docClient.send(
       new QueryCommand({
         TableName: TABLE_NAME,
-        IndexName: 'GSI2',
-        KeyConditionExpression: 'GSI2PK = :phone',
+        IndexName: "GSI2",
+        KeyConditionExpression: "GSI2PK = :phone",
         ExpressionAttributeValues: {
-          ':phone': `PHONE#${phone}`,
+          ":phone": `PHONE#${phone}`,
         },
       })
     );
 
     // Find user with matching role
-    const user = result.Items?.find(item => item.role === role);
+    const user = result.Items?.find((item) => item.role === role);
 
     if (!user) {
       return {
         statusCode: 404,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'المستخدم غير موجود' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "المستخدم غير موجود" }),
       };
     }
 
     // ── Secure password comparison ──
     // Support both legacy plaintext (auto-upgrade) and bcrypt hashes
-    const storedPassword = String(user.password || '');
+    const storedPassword = String(user.password || "");
     let passwordValid = false;
 
-    if (storedPassword.startsWith('$2a$') || storedPassword.startsWith('$2b$')) {
+    if (
+      storedPassword.startsWith("$2a$") ||
+      storedPassword.startsWith("$2b$")
+    ) {
       // Already bcrypt-hashed
       passwordValid = await bcrypt.compare(password, storedPassword);
     } else {
@@ -172,9 +190,9 @@ async function handleLogin(
           await docClient.send(
             new UpdateCommand({
               TableName: TABLE_NAME,
-              Key: { PK: user.PK || user.id, SK: 'PROFILE' },
-              UpdateExpression: 'SET password = :hp',
-              ExpressionAttributeValues: { ':hp': hashed },
+              Key: { PK: user.PK || user.id, SK: "PROFILE" },
+              UpdateExpression: "SET password = :hp",
+              ExpressionAttributeValues: { ":hp": hashed },
             })
           );
           console.log(`[Auth] Auto-upgraded plaintext password for ${phone}`);
@@ -187,8 +205,8 @@ async function handleLogin(
     if (!passwordValid) {
       return {
         statusCode: 401,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'كلمة السر غير صحيحة' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "كلمة السر غير صحيحة" }),
       };
     }
 
@@ -197,24 +215,24 @@ async function handleLogin(
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         token,
         refreshToken,
         profile: {
           id: user.id,
           phoneNumber: user.phoneNumber,
-          displayName: user.displayName || '',
+          displayName: user.displayName || "",
           role: user.role,
         },
       }),
     };
   } catch (error) {
-    console.error('Login error:', error);
+    console.error("Login error:", error);
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'خطأ في الخادم' }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "خطأ في الخادم" }),
     };
   }
 }
@@ -224,14 +242,14 @@ async function handleSendOTP(
   docClient: DynamoDBDocumentClient
 ): Promise<APIGatewayProxyResultV2> {
   try {
-    const body: SendOtpRequest = JSON.parse(event.body || '{}');
+    const body: SendOtpRequest = JSON.parse(event.body || "{}");
     const { phoneNumber } = body;
 
     if (!phoneNumber) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'رقم الهاتف مطلوب' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "رقم الهاتف مطلوب" }),
       };
     }
 
@@ -241,15 +259,15 @@ async function handleSendOTP(
     if (!otpResponse.success) {
       return {
         statusCode: 500,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: 'فشل إرسال رمز التحقق',
-          error: otpResponse.error 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "فشل إرسال رمز التحقق",
+          error: otpResponse.error,
         }),
       };
     }
 
-    const sessionId = otpResponse.sessionId || randomBytes(16).toString('hex');
+    const sessionId = otpResponse.sessionId || randomBytes(16).toString("hex");
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
 
     // Store OTP session in DynamoDB — always store phone WITHOUT + for consistent comparison
@@ -276,22 +294,24 @@ async function handleSendOTP(
       })
     );
 
-    console.log(`[OTP] Sent to ${phoneNumber} via ${otpiqService.getStatus().provider}`);
+    console.log(
+      `[OTP] Sent to ${phoneNumber} via ${otpiqService.getStatus().provider}`
+    );
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sessionId,
-        message: 'تم إرسال رمز التحقق',
+        message: "تم إرسال رمز التحقق",
       }),
     };
   } catch (error) {
-    console.error('Send OTP error:', error);
+    console.error("Send OTP error:", error);
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'خطأ في إرسال الرمز' }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "خطأ في إرسال الرمز" }),
     };
   }
 }
@@ -301,14 +321,14 @@ async function handleVerifyOTP(
   docClient: DynamoDBDocumentClient
 ): Promise<APIGatewayProxyResultV2> {
   try {
-    const body = JSON.parse(event.body || '{}');
+    const body = JSON.parse(event.body || "{}");
     const { sessionId, otp } = body;
 
     if (!sessionId || !otp) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'معرف الجلسة والرمز مطلوبان' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "معرف الجلسة والرمز مطلوبان" }),
       };
     }
 
@@ -318,7 +338,7 @@ async function handleVerifyOTP(
         TableName: TABLE_NAME,
         Key: {
           PK: `OTP#${sessionId}`,
-          SK: 'SESSION',
+          SK: "SESSION",
         },
       })
     );
@@ -328,16 +348,16 @@ async function handleVerifyOTP(
     if (!session) {
       return {
         statusCode: 404,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'جلسة غير صالحة' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "جلسة غير صالحة" }),
       };
     }
 
     if (session.expiresAt < Date.now()) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'انتهت صلاحية الرمز' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "انتهت صلاحية الرمز" }),
       };
     }
 
@@ -346,8 +366,10 @@ async function handleVerifyOTP(
     if (attempts >= MAX_OTP_ATTEMPTS) {
       return {
         statusCode: 429,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'تم تجاوز الحد الأقصى من المحاولات. أعد إرسال الرمز.' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "تم تجاوز الحد الأقصى من المحاولات. أعد إرسال الرمز.",
+        }),
       };
     }
 
@@ -356,15 +378,15 @@ async function handleVerifyOTP(
       await docClient.send(
         new UpdateCommand({
           TableName: TABLE_NAME,
-          Key: { PK: `OTP#${sessionId}`, SK: 'SESSION' },
-          UpdateExpression: 'SET attempts = :a',
-          ExpressionAttributeValues: { ':a': attempts + 1 },
+          Key: { PK: `OTP#${sessionId}`, SK: "SESSION" },
+          UpdateExpression: "SET attempts = :a",
+          ExpressionAttributeValues: { ":a": attempts + 1 },
         })
       );
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'الرمز غير صحيح' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "الرمز غير صحيح" }),
       };
     }
 
@@ -382,19 +404,19 @@ async function handleVerifyOTP(
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         verified: true,
         phoneNumber: session.phoneNumber,
-        message: 'تم التحقق بنجاح',
+        message: "تم التحقق بنجاح",
       }),
     };
   } catch (error) {
-    console.error('Verify OTP error:', error);
+    console.error("Verify OTP error:", error);
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'خطأ في التحقق' }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "خطأ في التحقق" }),
     };
   }
 }
@@ -404,14 +426,14 @@ async function handleSignup(
   docClient: DynamoDBDocumentClient
 ): Promise<APIGatewayProxyResultV2> {
   try {
-    const body: SignupRequest = JSON.parse(event.body || '{}');
+    const body: SignupRequest = JSON.parse(event.body || "{}");
     const { phoneNumber, role, password, displayName, sessionId, otp } = body;
 
     if (!phoneNumber || !password || !sessionId || !otp) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'جميع الحقول مطلوبة' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "جميع الحقول مطلوبة" }),
       };
     }
 
@@ -419,8 +441,10 @@ async function handleSignup(
     if (password.length < 6) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'كلمة السر يجب أن تكون 6 أحرف على الأقل' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "كلمة السر يجب أن تكون 6 أحرف على الأقل",
+        }),
       };
     }
 
@@ -430,7 +454,7 @@ async function handleSignup(
         TableName: TABLE_NAME,
         Key: {
           PK: `OTP#${sessionId}`,
-          SK: 'SESSION',
+          SK: "SESSION",
         },
       })
     );
@@ -440,24 +464,24 @@ async function handleSignup(
     if (!otpSession) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'جلسة التحقق غير صالحة أو منتهية' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "جلسة التحقق غير صالحة أو منتهية" }),
       };
     }
 
     if (otpSession.expiresAt < Date.now()) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'انتهت صلاحية رمز التحقق' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "انتهت صلاحية رمز التحقق" }),
       };
     }
 
     if (otpSession.code !== otp) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'رمز التحقق غير صحيح' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "رمز التحقق غير صحيح" }),
       };
     }
 
@@ -467,8 +491,10 @@ async function handleSignup(
     if (sessionPhone !== requestPhone) {
       return {
         statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'رقم الهاتف لا يتطابق مع جلسة التحقق' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "رقم الهاتف لا يتطابق مع جلسة التحقق",
+        }),
       };
     }
 
@@ -476,27 +502,29 @@ async function handleSignup(
     const existingUser = await docClient.send(
       new QueryCommand({
         TableName: TABLE_NAME,
-        IndexName: 'GSI2',
-        KeyConditionExpression: 'GSI2PK = :phone',
+        IndexName: "GSI2",
+        KeyConditionExpression: "GSI2PK = :phone",
         ExpressionAttributeValues: {
-          ':phone': `PHONE#${requestPhone}`,
+          ":phone": `PHONE#${requestPhone}`,
         },
       })
     );
 
     // Check if any user with this phone has the same role
-    const userWithSameRole = existingUser.Items?.find(item => item.role === role);
+    const userWithSameRole = existingUser.Items?.find(
+      (item) => item.role === role
+    );
     if (userWithSameRole) {
       return {
         statusCode: 409,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'المستخدم موجود بالفعل' }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "المستخدم موجود بالفعل" }),
       };
     }
 
     // Create new user with hashed password
-    const userId = `USER#${randomBytes(16).toString('hex')}`;
-    const userRole = role || 'USER';
+    const userId = `USER#${randomBytes(16).toString("hex")}`;
+    const userRole = role || "USER";
     const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     await docClient.send(
@@ -504,13 +532,13 @@ async function handleSignup(
         TableName: TABLE_NAME,
         Item: {
           PK: userId,
-          SK: 'PROFILE',
+          SK: "PROFILE",
           GSI2PK: `PHONE#${requestPhone}`,
           GSI2SK: `ROLE#${userRole}#${userId}`,
           id: userId,
           phoneNumber: requestPhone,
           password: hashedPassword,
-          displayName: displayName || '',
+          displayName: displayName || "",
           role: userRole,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -523,24 +551,24 @@ async function handleSignup(
 
     return {
       statusCode: 201,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         token,
         refreshToken,
         profile: {
           id: userId,
           phoneNumber: requestPhone,
-          displayName: displayName || '',
+          displayName: displayName || "",
           role: userRole,
         },
       }),
     };
   } catch (error) {
-    console.error('Signup error:', error);
+    console.error("Signup error:", error);
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'خطأ في إنشاء الحساب' }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "خطأ في إنشاء الحساب" }),
     };
   }
 }
